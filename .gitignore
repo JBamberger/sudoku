@@ -1,4 +1,12 @@
 .idea/
-cmake/
-cmake-build-debug/
+.vs/
+.vscode/
+
+out/
+bin/
+build/
+
+*.o
 *.exe
+*.dll
+*.lib

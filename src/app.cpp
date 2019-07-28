@@ -9,7 +9,6 @@
 #include <iostream>
 
 #include "DigitClassifier.h"
-#include "SudokuDetector.h"
 
 using cv::Mat;
 using cv::Point;
@@ -66,7 +65,7 @@ discardLines(const std::vector<cv::Vec3f> &lines, const float minAngleDiff, cons
 int main(int argc, char *argv[]) {
     std::cout << "Hello, World!" << std::endl;
 
-    auto sudoku = cv::imread(R"(C:\Users\Jannik\Desktop\sudoku-sk2.jpg)", 0);
+    auto sudoku = cv::imread(R"(../../../share/sudoku-sk2.jpg)", 0);
     cv::Size newsize = sudoku.size();
     newsize.height = newsize.height / 2;
     newsize.width = newsize.width / 2;
@@ -83,7 +82,7 @@ int main(int argc, char *argv[]) {
 
 //    imshow("image", sudoku);
 //    imshow("thresh", thresh);
-////    imshow("edges", edges);
+//    imshow("edges", edges);
 //    imshow("threshedges", threshEdges);
 
     std::vector<cv::Vec3f> lines;
@@ -134,21 +133,6 @@ int main(int argc, char *argv[]) {
 
 
     cv::waitKey();
-
-//    auto *sudokuDetector = SudokuDetector::createInstance(DetectorType::SIMPLE_DETECTOR);
-//    auto *digitClassifier = new DigitClassifier();
-//
-//    std::vector<cv::Mat> digits = sudokuDetector->detectDigits(sudoku);
-//
-//    int col = 1;
-//    for (const auto& digit : digits) {
-//        int number = digitClassifier->classify(digit);
-//        printf("%d ", number);
-//        if (col % 9 == 0) {
-//            printf("\n");
-//        }
-//        col++;
-//    }
 
     return EXIT_SUCCESS;
 }
