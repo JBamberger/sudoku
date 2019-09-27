@@ -198,7 +198,7 @@ int main(int argc, char* argv[]) {
 
 	cv::Rect bbox = find_biggest_object(dilated);
 	cv::rectangle(sudoku, bbox, cv::Scalar{ 0,255,0 });
-	cv::imshow("bbox", sudoku);
+	//cv::imshow("bbox", sudoku);
 
 	cv::Size dsize{ 512,512 };
 	cv::Mat crop;
@@ -256,7 +256,7 @@ int main(int argc, char* argv[]) {
 	cv::Point2f lower_left = intersect(max_hline, max_vline);
 	cv::Point2f lower_right = intersect(min_hline, max_vline);
 
-
+#if 0
 	std::cout << min_hline << " " << max_hline << " " << min_vline << " " << max_vline << std::endl;
 	std::cout << upper_left << upper_right << lower_left << lower_right << std::endl;
 	std::cout << "Found " << h_lines.size() << " horizontal lines." << std::endl;
@@ -284,7 +284,7 @@ int main(int argc, char* argv[]) {
 	cv::circle(l_img, lower_left, 4, CV_RGB(255, 0, 255), 3);
 	cv::circle(l_img, lower_right, 4, CV_RGB(255, 0, 255), 3);
 	cv::imshow("lines and corners", l_img);
-
+#endif
 
 
 	const float dx = static_cast<float>(bbox.width) / static_cast<float>(dsize.width);
@@ -295,13 +295,13 @@ int main(int argc, char* argv[]) {
 	cv::Point2f lr_b = cv::Point2f(bbox.x + lower_right.x * dx, bbox.y + lower_right.y * dy);
 	std::cout << ul_b << ur_b << ll_b << lr_b << std::endl;
 
-	cv::Mat s1;
-	cv::cvtColor(sudoku, s1, CV_GRAY2BGR);
-	cv::circle(s1, ul_b, 4, CV_RGB(255, 0, 255), 3);
-	cv::circle(s1, ur_b, 4, CV_RGB(255, 0, 255), 3);
-	cv::circle(s1, ll_b, 4, CV_RGB(255, 0, 255), 3);
-	cv::circle(s1, lr_b, 4, CV_RGB(255, 0, 255), 3);
-	cv::imshow("points", s1);
+	//cv::Mat s1;
+	//cv::cvtColor(sudoku, s1, CV_GRAY2BGR);
+	//cv::circle(s1, ul_b, 4, CV_RGB(255, 0, 255), 3);
+	//cv::circle(s1, ur_b, 4, CV_RGB(255, 0, 255), 3);
+	//cv::circle(s1, ll_b, 4, CV_RGB(255, 0, 255), 3);
+	//cv::circle(s1, lr_b, 4, CV_RGB(255, 0, 255), 3);
+	//cv::imshow("points", s1);
 
 	std::vector<cv::Point2f> src;
 	src.push_back(ul_b);
@@ -319,8 +319,7 @@ int main(int argc, char* argv[]) {
 	dst.push_back(cv::Point2i{ 0, warp_size.height });
 	dst.push_back(cv::Point2i{ warp_size.width, warp_size.height });
 	cv::Mat warped;
-	cv::warpPerspective(sudoku, warped, cv::getPerspectiveTransform(src, dst), warp_size);
-
+	cv::warpPerspective(blurred, warped, cv::getPerspectiveTransform(src, dst), warp_size);
 	cv::imshow("warped", warped);
 
 	std::vector<cv::Mat> cells;
@@ -332,8 +331,48 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
+	DigitClassifier classifier = DigitClassifier();
+	std::vector<int> digits;
+	digits.reserve(81);
 	for (const auto& cell : cells) {
-		cv::imshow("cell", cell);
+		cv::Mat t_cell;
+		cv::adaptiveThreshold(cell, t_cell, 255, CV_ADAPTIVE_THRESH_GAUSSIAN_C, CV_THRESH_BINARY, 11, 2);
+		cv::medianBlur(t_cell, t_cell, 3);
+		//cv::dilate(t_cell, t_cell, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size{ 5,5 }));
+		//cv::erode(t_cell, t_cell, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size{ 5,5 }));
+
+
+		const int t = 4;
+		const int nnz_thresh = 20;
+		const int s = cell_size * cell_size;
+		for (int i = 0; i < t; i++) {
+			if (s - cv::countNonZero(t_cell.row(i)) > nnz_thresh) t_cell.row(i) = 255;
+			if (s - cv::countNonZero(t_cell.row(cell_size - i - 1)) > nnz_thresh) t_cell.row(cell_size - i - 1) = 255;
+			if (s - cv::countNonZero(t_cell.col(i)) > nnz_thresh) t_cell.col(i) = 255;
+			if (s - cv::countNonZero(t_cell.col(cell_size - i - 1)) > nnz_thresh) t_cell.col(cell_size - i - 1) = 255;
+		}
+
+
+		int digit = -1;
+		// invoke the classifier only if there is a minimum number of pixels set
+		if (s - cv::countNonZero(t_cell) > 0.1 * s) {
+			cv::Mat small = cv::Mat(20, 20, CV_8U);
+			cv::resize(t_cell, small, cv::Size(20,20));
+			small = cv::Scalar::all(255) - small;
+			digit = classifier.classify(small);
+		}
+
+		digits.push_back(digit);
+
+		// visualize cell content and wait
+		// cv::imshow("cell", t_cell); cv::waitKey();
+		std::cout << "digit=" << digit << ", count=" << (s - cv::countNonZero(t_cell)) << std::endl;
+	}
+
+
+	for (int i = 0; i < cells.size(); i++) {
+		cv::imshow("cell", cells.at(i));
+		std::cout << digits.at(i) << std::endl;
 		cv::waitKey();
 	}
 

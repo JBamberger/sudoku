@@ -1,107 +1,202 @@
 #include "DigitClassifier.h"
 
-void DigitClassifier::train() {
-    std::cout << "begin training" << std::endl;
-    Mat train_data_mat, train_label_mat;
-    Mat test_data_mat, test_label_mat;
+#include "opencv2/imgproc.hpp"
+#include "opencv2/imgcodecs.hpp"
+#include "opencv2/objdetect.hpp"
+#include "opencv2/ml/ml.hpp"
 
-    loadMNIST(R"(D:\datasets\mnist\train-images.idx3-ubyte)", R"(D:\datasets\mnist\train-labels.idx1-ubyte)",
-              train_data_mat, train_label_mat);
+#include <iostream>
+#include <fstream>
 
-    train_data_mat.convertTo(train_data_mat, CV_32FC1);
-    train_label_mat.convertTo(train_label_mat, CV_32SC1);
+#include <assert.h>
 
-    svm = ml::SVM::create();
-    svm->setType(ml::SVM::C_SVC);
-    svm->setKernel(ml::SVM::LINEAR);
-    svm->setTermCriteria(TermCriteria(TermCriteria::MAX_ITER, 500, 1e-6));
-    svm->train(train_data_mat, ml::SampleTypes::ROW_SAMPLE, train_label_mat);
-    svm->save("SVM_MNIST.xml");
-}
+class DigitClassifier::Impl {
+	constexpr static int IMAGE_SIZE = 20;
+	const std::string SVM_PATH = "SVM_DIGITS.yml";
+	const std::string TRAINING_PATH = "../../../share/digits.png";
 
-DigitClassifier::DigitClassifier() {
-    try {
-        svm = Algorithm::load<ml::SVM>("SVM_MNIST.xml");
-    } catch (const Exception &ex) {
-        std::cout << "Error: " << ex.what() << std::endl;
-        train();
-    }
-}
+	cv::Ptr<cv::ml::SVM> svm;
+	cv::HOGDescriptor hogDescriptor;
 
-DigitClassifier::~DigitClassifier() {
-    delete svm;
-}
+public:
+	Impl() {
+		hogDescriptor = HOGDescriptor{
+		Size(20, 20), //winSize
+		Size(8, 8), //blocksize
+		Size(4, 4), //blockStride,
+		Size(8, 8), //cellSize,
+		9, //nbins,
+		1, //derivAper,
+		-1, //winSigma,
+		0, //histogramNormType,
+		0.2, //L2HysThresh,
+		0,//gammal correction,
+		64,//nlevels=64
+		1 };
+		svm = loadOrTrain();
+	}
 
-int reverseInt(int i) {
-    unsigned char ch1, ch2, ch3, ch4;
-    ch1 = i & 255u;
-    ch2 = (i >> 8u) & 255u;
-    ch3 = (i >> 16u) & 255u;
-    ch4 = (i >> 24u) & 255u;
+	~Impl() {
+	}
 
-    return ((int) ch1 << 24u) + ((int) ch2 << 16u) + ((int) ch3 << 8u) + ch4;
-}
+	int classify(const cv::Mat& img) {
+		std::vector<float> features = preprocessImage(img);
 
-bool DigitClassifier::loadMNIST(const std::string &pic_filename, const std::string &label_filename,
-                                Mat &training_data, Mat &label_data) {
-    std::ifstream pic_file(pic_filename, std::ios::binary);
-    std::ifstream label_file(label_filename, std::ios::binary);
+		const size_t feat_cnt = features.size();
+		cv::Mat preprocessedImg(1, feat_cnt, CV_32FC1);
+		cv::Mat response;
 
-    if (!pic_file.is_open() || !label_file.is_open()) {
-        return false;
-    }
+		for (size_t j = 0; j < feat_cnt; j++) {
+			preprocessedImg.at<float>(0, j) = features.at(j);
+		}
 
-    int magic_number = 0;
-    int N = 0;
-    int n_rows = 0;
-    int n_cols = 0;
+		try {
+			svm->predict(preprocessedImg, response);
+			return response.at<float>(0, 0);
+		}
+		catch (const cv::Exception& e) {
+			std::cout << e.what() << std::endl;
+			throw e;
+		}
+	}
 
-    label_file.read((char *) &magic_number, sizeof(magic_number));
-    pic_file.read((char *) &magic_number, sizeof(magic_number));
-    magic_number = reverseInt(magic_number);
+private:
+	cv::Ptr<cv::ml::SVM> loadOrTrain() {
+		try {
+			std::cout << "Trying to load SVM from disk." << std::endl;
 
-    label_file.read((char *) &N, sizeof(N));
-    pic_file.read((char *) &N, sizeof(N));
-    N = reverseInt(N);
+			cv::Ptr<cv::ml::SVM> svm = Algorithm::load<ml::SVM>(SVM_PATH);
 
-    pic_file.read((char *) &n_rows, sizeof(n_rows));
-    n_rows = reverseInt(n_rows);
-    pic_file.read((char *) &n_cols, sizeof(n_cols));
-    n_cols = reverseInt(n_cols);
+			std::cout << "Loading finished." << std::endl;
+			return svm;
+		}
+		catch (...) {
+			std::cout << "Could not load SVM from disk. Begin training." << std::endl;
 
-    int imgSize = n_cols * n_rows;
-    training_data = Mat(N, imgSize, CV_8U);
-    label_data = Mat(N, 1, CV_8U);
-
-    for (int i = 0; i < N; ++i) {
-        unsigned char buffer[28*28];
-        pic_file.read((char *) buffer, sizeof(unsigned char) * imgSize);
-        cv::Mat row_image(1, (int) imgSize, CV_8U, buffer);
-        row_image.row(0).copyTo(training_data.row(i));
-
-        char label = 0;
-        label_file.read((char *) &label, sizeof(label));
-        label_data.at<uchar>(i, 0) = label;
-    }
-
-    return true;
-}
+			// Load the training data from the image file
+			cv::Mat digits;
+			std::vector<int> labels;
+			std::tie(digits, labels) = loadTrainingData(TRAINING_PATH);
 
 
-int DigitClassifier::classify(cv::Mat img) {
-    Mat cloneImg = preprocessImage(img);
-    return svm->predict(cloneImg);
-    // return knn->findNearest(Mat_<float>(cloneImg), 1);
-}
+			// SVM initialization
+			cv::Ptr<cv::ml::SVM> svm = ml::SVM::create();
+			svm->setType(ml::SVM::C_SVC);
+			svm->setTermCriteria(TermCriteria(TermCriteria::MAX_ITER, 500, 1e-6));
 
-cv::Mat DigitClassifier::preprocessImage(cv::Mat &image) {
-//    Mat small = Mat(20,20, CV_8U);
-//    cv::resize(image, small, Size(20,20));
+			//svm->setKernel(ml::SVM::LINEAR);
+			svm->setKernel(ml::SVM::RBF);
+			svm->setGamma(0.5); // 0.5
+			svm->setC(12.5); // 12.5
 
-    Mat output = Mat(28, 28, CV_8U);
-    cv::resize(image, output, Size(28, 28));
-    output = output.reshape(0, 1);
-    output.convertTo(output, CV_32FC1);
-    //std::cout << output.size().width << "x" << output.size().height << std::endl;
-    return output;
+			// SVM training
+			try {
+				svm->train(digits, ml::SampleTypes::ROW_SAMPLE, labels);
+			}
+			catch (const cv::Exception& e) {
+				std::cout << e.what() << std::endl;
+				throw e;
+			}
+
+			// Persist SVM for the next invokation.
+			svm->save(SVM_PATH);
+
+			std::cout << "Training finished." << std::endl;
+			return svm;
+		}
+	}
+
+
+	/**
+	* This function deskews an input image of size 20x20 grayscale and then computes HoG features.
+	*/
+	std::vector<float> preprocessImage(const cv::Mat& image) {
+		assert(image.size().height == 20);
+		assert(image.size().width == 20);
+		assert(image.type() == CV_8U);
+
+		// Deskew image if necessary
+		const cv::Moments& moments = cv::moments(image);
+		cv::Mat imgOut = cv::Mat::zeros(image.rows, image.cols, image.type());
+		if (cv::abs(moments.mu02 < 1e-2)) {
+			imgOut = image;
+		}
+		else {
+			const double skew = moments.mu11 / moments.mu02;
+			cv::Mat warpMat = (cv::Mat_<double>(2, 3) << 1, skew, -0.5 * IMAGE_SIZE * skew, 0, 1, 0);
+			cv::warpAffine(image, imgOut, warpMat, imgOut.size(), WARP_INVERSE_MAP | INTER_LINEAR);
+		}
+
+		// compute HoG features
+		std::vector<float> descriptors;
+		hogDescriptor.compute(imgOut, descriptors);
+
+		return descriptors;
+	}
+
+
+
+	//    Mat small = Mat(20,20, CV_8U);
+	//    cv::resize(image, small, Size(20,20));
+
+	//Mat output = Mat(28, 28, CV_8U);
+	//cv::resize(image, output, Size(28, 28));
+	//output = output.reshape(0, 1);
+	//output.convertTo(output, CV_32FC1);
+	////std::cout << output.size().width << "x" << output.size().height << std::endl;
+	//return output;
+
+/**
+* This function loads and preprocessed the training data set which is
+* stored in a grayscale image file with five rows of 100 images per
+* class.
+*/
+	std::pair<cv::Mat, std::vector<int>> loadTrainingData(const std::string& path) {
+		cv::Mat inputImage = cv::imread(path, IMREAD_GRAYSCALE);
+
+		if (inputImage.data == nullptr) {
+			std::cout << "Could not read training data image." << std::endl;
+			throw std::exception("Could not read training data.");
+		}
+
+		std::vector<std::vector<float>> features;
+		features.reserve(5000);
+		std::vector<int> labels;
+		labels.reserve(5000);
+
+		for (int r = 0; r < inputImage.rows; r = r + IMAGE_SIZE) {
+			for (int c = 0; c < inputImage.cols; c = c + IMAGE_SIZE) {
+				const cv::Mat& digit = inputImage.colRange(c, c + IMAGE_SIZE).rowRange(r, r + IMAGE_SIZE);
+				std::vector<float> preprocessedDigit = preprocessImage(digit);
+				features.push_back(preprocessedDigit);
+				labels.push_back(r / (5 * IMAGE_SIZE));
+			}
+		}
+
+		assert(features.size() == 5000);
+		assert(labels.size() == 5000);
+
+		const size_t len = features.size();
+		const size_t feat_cnt = features.at(0).size();
+
+		int im_cnt = 0;
+		cv::Mat images(len, feat_cnt, CV_32FC1);
+
+		for (size_t i = 0; i < len; i++) {
+			for (size_t j = 0; j < feat_cnt; j++) {
+				images.at<float>(i, j) = features.at(i).at(j);
+			}
+		}
+
+		return std::pair<cv::Mat, std::vector<int>>(images, labels);
+	}
+};
+
+
+DigitClassifier::DigitClassifier() : pimpl{ new Impl } {}
+
+DigitClassifier::~DigitClassifier() = default;
+
+int DigitClassifier::classify(const cv::Mat& img) {
+	return pimpl->classify(img);
 }
