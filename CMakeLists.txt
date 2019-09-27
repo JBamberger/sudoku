@@ -12,6 +12,7 @@ find_package(OpenCV 3 REQUIRED core imgcodecs imgproc highgui videoio objdetect 
 add_executable(sudoku 
     src/app.cpp
     src/DigitClassifier.cpp
+	src/SudokuDetector.cpp
 )
 target_include_directories(sudoku PRIVATE
 	${OpenCV_INCLUDE_DIRS}
