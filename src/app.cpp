@@ -55,11 +55,8 @@ int main(int argc, char* argv[]) {
 
 		// visualize cell content and wait
 		// cv::imshow("cell", t_cell); cv::waitKey();
-		std::cout << "digit=" << digit << ", count=" << (s - cv::countNonZero(t_cell)) << std::endl;
+		// std::cout << "digit=" << digit << ", count=" << (s - cv::countNonZero(t_cell)) << std::endl;
 	}
-
-
-
 
 	cv::Mat resultImg;
 	cv::cvtColor(sudokuImg, resultImg, COLOR_GRAY2BGR);
@@ -84,7 +81,7 @@ int main(int argc, char* argv[]) {
 		}
 
 
-		std::cout << digits.at(i) << std::endl;
+		// std::cout << digits.at(i) << std::endl;
 	}
 
 	Quad c = sudoku.corners;

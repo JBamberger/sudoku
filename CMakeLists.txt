@@ -13,6 +13,7 @@ add_executable(sudoku
     src/app.cpp
     src/DigitClassifier.cpp
 	src/SudokuDetector.cpp
+	src/SudokuSolver.cpp
 )
 target_include_directories(sudoku PRIVATE
 	${OpenCV_INCLUDE_DIRS}
