@@ -9,8 +9,10 @@ Idea:
 
 Current problems:
 
-- Sudoku detection is not complete
-- Digit classifier can be trained on MNIST but there is no input normalization therefore the classifier does not work.
-- Hardcoded paths
-- No sudoku solver
-- Probably a lot more
+- [x] Sudoku detection is not complete
+- [x] Digit classifier can be trained on MNIST but there is no input normalization therefore the classifier does not work.
+- [ ] The classifier has a very low accuracy.
+- [ ] Hardcoded paths
+- [x] No sudoku solver
+- [ ] The entire pipeline is probably not very robust and there are no tests.
+- [ ] Probably a lot more
