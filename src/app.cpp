@@ -13,15 +13,39 @@
 #include "DigitClassifier.h"
 #include "SudokuDetector.h"
 
+cv::Mat keep_largest_blob(const cv::Mat& in) {
+	int count = 0;
+	int max = -1;
+	cv::Point2i maxPt;
+	cv::Mat tmp = in.clone();
+	cv::bitwise_not(tmp, tmp);
+
+	for (int row = 0; row < tmp.rows; row++) {
+		for (int col = 0; col < tmp.cols; col++) {
+			if (tmp.at<uint8_t>(row, col) < 128) continue; // skip processed and background pixels
+			int area = cv::floodFill(tmp, cv::Point2i(col, row), 64);
+			if (area <= max) continue; // keep only the largest blob
+			maxPt = cv::Point2i(col, row);
+			max = area;
+		}
+	}
+	tmp = 128 + in.clone() * 0.5;
+	int area = cv::floodFill(tmp, maxPt, 0);
+
+	cv::threshold(tmp, tmp, 64, 255, THRESH_BINARY);
+
+	return tmp;
+}
+
+
 int main(int argc, char* argv[]) {
 
 	cv::Mat sudokuImg = cv::imread(R"(../../../share/sudoku-sk.jpg)", 0);
 	cv::resize(sudokuImg, sudokuImg, cv::Size(), 0.5, 0.5);
 
-	SudokuDetector detector = SudokuDetector(sudokuImg);
 	DigitClassifier classifier = DigitClassifier();
 
-	Sudoku sudoku = detector.get_result();
+	Sudoku sudoku = detect_sudoku(sudokuImg);
 
 	const int cell_size = 28;
 	std::vector<int> digits;
@@ -30,6 +54,7 @@ int main(int argc, char* argv[]) {
 		cv::Mat t_cell;
 		cv::adaptiveThreshold(sudoku.aligned(cell), t_cell, 255, CV_ADAPTIVE_THRESH_GAUSSIAN_C, CV_THRESH_BINARY, 11, 2);
 		cv::medianBlur(t_cell, t_cell, 3);
+
 
 		const int t = 4;
 		const int nnz_thresh = 20;
@@ -41,6 +66,9 @@ int main(int argc, char* argv[]) {
 			if (s - cv::countNonZero(t_cell.col(cell_size - i - 1)) > nnz_thresh) t_cell.col(cell_size - i - 1) = 255;
 		}
 
+		cv::Mat out = keep_largest_blob(t_cell);
+
+		//cv::Mat h;		cv::hconcat(t_cell, out, h);		cv::imshow("cell", h); cv::waitKey();
 
 		int digit = -1;
 		// invoke the classifier only if there is a minimum number of pixels set
@@ -89,6 +117,7 @@ int main(int argc, char* argv[]) {
 	cv::line(resultImg, c.tr, c.br, { 0,255,0 });
 	cv::line(resultImg, c.br, c.bl, { 0,255,0 });
 	cv::line(resultImg, c.bl, c.tl, { 0,255,0 });
+	cv::rectangle(resultImg, sudoku.bbox, { 0,0,255 });
 	cv::imshow("Result", resultImg);
 	cv::waitKey();
 

@@ -10,7 +10,7 @@ struct Quad {
 	cv::Point2f br;
 	cv::Point2f bl;
 
-	inline std::vector< cv::Point2f> asVec() {
+	inline std::vector< cv::Point2f> asVec() const {
 		std::vector<cv::Point2f> out;
 		out.push_back(tl);
 		out.push_back(tr);
@@ -21,8 +21,14 @@ struct Quad {
 };
 
 struct Sudoku {
+	// input image
+	const cv::Mat input;
+
 	// aligned (square) version of the sudoku
 	cv::Mat aligned;
+
+	// bounding box of the first detection
+	cv::Rect bbox;
 
 	// corner points in the original image
 	Quad corners;
@@ -30,16 +36,13 @@ struct Sudoku {
 	// sudoku cells in row-major order
 	std::vector<cv::Rect2i> cells;
 
-	cv::Mat warpMap;   // from unwarped -> warped
-	cv::Mat unwarpMap; // from warped -> unwarped
+	// mapping from unwarped to warped
+	cv::Mat warpMap;
+
+	// mapping from warped to unwarped
+	cv::Mat unwarpMap;
+
+	Sudoku(const cv::Mat input) : input(input) {}
 };
 
-class SudokuDetector {
-	class Impl;
-	std::unique_ptr<Impl> pimpl;
-
-public:
-	SudokuDetector(cv::Mat image);
-	~SudokuDetector();
-	Sudoku get_result();
-};
+Sudoku detect_sudoku(const cv::Mat& input);
