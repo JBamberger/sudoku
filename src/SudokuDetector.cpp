@@ -1,6 +1,7 @@
 #include "SudokuDetector.h"
 
 #include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
 #include <iostream>   
 
 
@@ -226,7 +227,7 @@ void compute_unwarp_transform(Sudoku& sudoku) {
 
 
 /**
- * This function computes the location of all sudoku cells. 
+ * This function computes the location of all sudoku cells.
  */
 void get_cells(Sudoku& sudoku) {
 	sudoku.cells.reserve(81);
@@ -236,6 +237,70 @@ void get_cells(Sudoku& sudoku) {
 			sudoku.cells.push_back(cellRect);
 		}
 	}
+}
+
+cv::Mat keep_largest_blob(const cv::Mat& in) {
+	int count = 0;
+	int max = -1;
+	cv::Point2i maxPt;
+	cv::Mat tmp = in.clone();
+	cv::bitwise_not(tmp, tmp);
+
+	for (int row = 0; row < tmp.rows; row++) {
+		for (int col = 0; col < tmp.cols; col++) {
+			if (tmp.at<uint8_t>(row, col) < 128) continue; // skip processed and background pixels
+			int area = cv::floodFill(tmp, cv::Point2i(col, row), 64);
+			if (area <= max) continue; // keep only the largest blob
+			maxPt = cv::Point2i(col, row);
+			max = area;
+		}
+	}
+	tmp = 128 + in.clone() * 0.5;
+	int area = cv::floodFill(tmp, maxPt, 0);
+
+	cv::threshold(tmp, tmp, 64, 255, CV_THRESH_BINARY);
+
+	if (max == -1)
+		return in.clone();
+	else
+		return tmp;
+}
+
+void get_cell_contents(Sudoku& sudoku) {
+	cv::Mat img;
+	cv::Mat threshed;
+	cv::GaussianBlur(sudoku.aligned, img, { 5,5 }, 1);
+	cv::adaptiveThreshold(img, img, 255, CV_ADAPTIVE_THRESH_GAUSSIAN_C, CV_THRESH_BINARY, 11, 2);
+	cv::medianBlur(img, img, 3);
+
+
+	sudoku.cell_contents.reserve(81);
+	for (const auto& cell : sudoku.cells) {
+		cv::Mat t_cell = img(cell);
+
+
+		const int t = 4;
+		const int nnz_thresh = 20;
+		const int s = cell_size * cell_size;
+		for (int i = 0; i < t; i++) {
+			if (s - cv::countNonZero(t_cell.row(i)) > nnz_thresh) t_cell.row(i) = 255;
+			if (s - cv::countNonZero(t_cell.row(cell_size - i - 1)) > nnz_thresh) t_cell.row(cell_size - i - 1) = 255;
+			if (s - cv::countNonZero(t_cell.col(i)) > nnz_thresh) t_cell.col(i) = 255;
+			if (s - cv::countNonZero(t_cell.col(cell_size - i - 1)) > nnz_thresh) t_cell.col(cell_size - i - 1) = 255;
+		}
+
+		cv::Mat out = keep_largest_blob(t_cell);
+
+		cv::Mat output_cell = cv::Mat(20, 20, CV_8U);
+		cv::resize(out, output_cell, cv::Size(20, 20));
+		output_cell = cv::Scalar::all(255) - output_cell;
+
+		//const int C = 20 * 20;
+		//std::cout << output_cell << (cv::countNonZero(output_cell) > 0.08 * C) << std::endl;
+		//cv::Mat h; cv::hconcat(t_cell, out, h); cv::imshow("cell", output_cell); cv::waitKey();
+		sudoku.cell_contents.push_back(output_cell);
+	}
+
 }
 
 /**
@@ -249,5 +314,6 @@ Sudoku detect_sudoku(const cv::Mat& input)
 	detect_sudoku_corners(sudoku, inverted);
 	compute_unwarp_transform(sudoku);
 	get_cells(sudoku);
+	get_cell_contents(sudoku);
 	return sudoku;
 }

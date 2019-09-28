@@ -36,6 +36,9 @@ struct Sudoku {
 	// sudoku cells in row-major order
 	std::vector<cv::Rect2i> cells;
 
+	// sudoku cell contents
+	std::vector<cv::Mat> cell_contents;
+
 	// mapping from unwarped to warped
 	cv::Mat warpMap;
 
