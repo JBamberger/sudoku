@@ -1,17 +1,12 @@
-#include "app.h"
-
-#include <opencv2/core.hpp>
-#include <opencv2/highgui.hpp>
-#include <opencv2/imgproc.hpp>
-
-#include <algorithm>
-#include <iomanip>
-#include <iostream>
-#include <limits>
-#include <vector>
 
 #include "DigitClassifier.h"
 #include "SudokuDetector.h"
+
+#include <limits>
+#include <opencv2/core.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
+#include <vector>
 
 int
 main(int argc, char* argv[])
@@ -21,7 +16,7 @@ main(int argc, char* argv[])
     cv::resize(sudokuImg, sudokuImg, cv::Size(), 0.5, 0.5);
 
     DigitClassifier classifier = DigitClassifier();
-    Sudoku sudoku = detect_sudoku(sudokuImg);
+    Sudoku sudoku = SudokuDetector().detect_sudoku(sudokuImg);
 
     std::vector<int> digits;
     digits.reserve(81);

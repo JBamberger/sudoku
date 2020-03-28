@@ -1,7 +1,7 @@
 #pragma once
 
-#include "opencv2/core/core.hpp"
 #include <memory>
+#include <opencv2/core/core.hpp>
 
 using namespace cv;
 

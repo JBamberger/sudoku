@@ -1,14 +1,11 @@
 #include "DigitClassifier.h"
 
-#include "opencv2/imgcodecs.hpp"
-#include "opencv2/imgproc.hpp"
-#include "opencv2/ml/ml.hpp"
-#include "opencv2/objdetect.hpp"
-
-#include <fstream>
+#include <cassert>
 #include <iostream>
-
-#include <assert.h>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/ml/ml.hpp>
+#include <opencv2/objdetect.hpp>
 
 class DigitClassifier::Impl
 {
@@ -117,7 +114,7 @@ class DigitClassifier::Impl
         // Deskew image if necessary
         const cv::Moments& moments = cv::moments(image);
         cv::Mat imgOut = cv::Mat::zeros(image.rows, image.cols, image.type());
-        if (cv::abs(moments.mu02 < 1e-2)) {
+        if (cv::abs(moments.mu02) < 1e-2) {
             imgOut = image;
         } else {
             const double skew = moments.mu11 / moments.mu02;

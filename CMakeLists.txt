@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD 17)
 find_package(OpenCV 4 REQUIRED core imgcodecs imgproc highgui videoio objdetect ml)
 
 add_executable(sudoku
-        src/app.cpp include/app.h
+        src/app.cpp
         src/DigitClassifier.cpp include/DigitClassifier.h
         src/SudokuDetector.cpp include/SudokuDetector.h
         src/SudokuSolver.cpp include/SudokuSolver.h

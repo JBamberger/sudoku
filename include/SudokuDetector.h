@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <opencv2/core/core.hpp>
+#include <utility>
 #include <vector>
 
 struct Quad
@@ -11,7 +12,7 @@ struct Quad
     cv::Point2f br;
     cv::Point2f bl;
 
-    inline std::vector<cv::Point2f> asVec() const
+    [[nodiscard]] inline std::vector<cv::Point2f> asVec() const
     {
         std::vector<cv::Point2f> out;
         out.push_back(tl);
@@ -48,10 +49,18 @@ struct Sudoku
     // mapping from warped to unwarped
     cv::Mat unwarpMap;
 
-    Sudoku(const cv::Mat input)
-      : input(input)
+    explicit Sudoku(cv::Mat input)
+      : input(std::move(input))
     {}
 };
 
-Sudoku
-detect_sudoku(const cv::Mat& input);
+class SudokuDetector
+{
+    class Impl;
+    std::unique_ptr<Impl> pimpl;
+
+  public:
+    explicit SudokuDetector();
+    ~SudokuDetector();
+    Sudoku detect_sudoku(const cv::Mat& input);
+};
