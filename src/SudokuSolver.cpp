@@ -1,4 +1,4 @@
-#include "SudokuSolver.hpp"
+#include "SudokuSolver.h"
 
 #include <assert.h>
 
