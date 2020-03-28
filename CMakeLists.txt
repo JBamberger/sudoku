@@ -7,7 +7,7 @@ endif()
 project(sudoku)
 set(CMAKE_CXX_STANDARD 17)
 
-find_package(OpenCV 3 REQUIRED core imgcodecs imgproc highgui videoio objdetect ml)
+find_package(OpenCV 4 REQUIRED core imgcodecs imgproc highgui videoio objdetect ml)
 
 add_executable(sudoku 
     src/app.cpp

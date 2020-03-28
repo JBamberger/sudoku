@@ -13,14 +13,14 @@
 class DigitClassifier::Impl {
 	constexpr static int IMAGE_SIZE = 20;
 	const std::string SVM_PATH = "SVM_DIGITS.yml";
-	const std::string TRAINING_PATH = "../../../share/digits.png";
+	const std::string TRAINING_PATH = "../share/digits.png";
 
 	cv::Ptr<cv::ml::SVM> svm;
 	cv::HOGDescriptor hogDescriptor;
 
 public:
 	Impl() {
-		hogDescriptor = HOGDescriptor{
+		hogDescriptor = HOGDescriptor(
 		Size(20, 20), //winSize
 		Size(8, 8), //blocksize
 		Size(4, 4), //blockStride,
@@ -28,16 +28,15 @@ public:
 		9, //nbins,
 		1, //derivAper,
 		-1, //winSigma,
-		0, //histogramNormType,
+		cv::HOGDescriptor::HistogramNormType::L2Hys, //histogramNormType,
 		0.2, //L2HysThresh,
-		0,//gammal correction,
+		false,//gammal correction,
 		64,//nlevels=64
-		1 };
+		true );
 		svm = loadOrTrain();
 	}
 
-	~Impl() {
-	}
+	~Impl() = default;
 
 	int classify(const cv::Mat& img) {
 		std::vector<float> features = preprocessImage(img);

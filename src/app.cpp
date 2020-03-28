@@ -16,7 +16,7 @@
 
 int main(int argc, char* argv[]) {
 
-	cv::Mat sudokuImg = cv::imread(R"(../../../share/sudoku-sk.jpg)", 0);
+	cv::Mat sudokuImg = cv::imread(R"(../share/sudoku-sk.jpg)", 0);
 	cv::resize(sudokuImg, sudokuImg, cv::Size(), 0.5, 0.5);
 
 	DigitClassifier classifier = DigitClassifier();
@@ -47,7 +47,7 @@ int main(int argc, char* argv[]) {
 			cv::Point2i location{ (int)u.at<double>(0,0), (int)u.at<double>(1,0) };
 
 			cv::putText(resultImg, std::to_string(digits.at(i)), location,
-				FONT_HERSHEY_COMPLEX_SMALL, 1, { 0, 255, 0 }, 1, CV_AA);
+				FONT_HERSHEY_COMPLEX_SMALL, 1, { 0, 255, 0 }, 1, cv::LINE_AA);
 		}
 
 

@@ -20,7 +20,7 @@ void preprocess_image(Sudoku& sudoku, cv::Mat& inverted) {
 	// preprocess input image for later steps: blurring, thresholding, inverting and dilating
 	cv::Mat blurred;
 	cv::GaussianBlur(sudoku.input, blurred, cv::Size(11, 11), 3);
-	cv::adaptiveThreshold(blurred, inverted, 255, CV_ADAPTIVE_THRESH_GAUSSIAN_C, CV_THRESH_BINARY, 11, 2);
+	cv::adaptiveThreshold(blurred, inverted, 255, cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, 11, 2);
 	cv::bitwise_not(inverted, inverted);
 }
 
@@ -40,7 +40,7 @@ cv::Rect find_rough_crop_region(const cv::Mat& inverted) {
 	std::vector< std::vector<cv::Point> > contours;
 	std::vector<cv::Vec4i> hierarchy;
 
-	cv::findContours(dilated, contours, hierarchy, CV_RETR_CCOMP, CV_CHAIN_APPROX_SIMPLE);
+	cv::findContours(dilated, contours, hierarchy, cv::RETR_CCOMP, cv::CHAIN_APPROX_SIMPLE);
 
 	for (int i = 0; i < contours.size(); i++) {
 		double a = cv::contourArea(contours[i], false);
@@ -258,7 +258,7 @@ cv::Mat keep_largest_blob(const cv::Mat& in) {
 	tmp = 128 + in.clone() * 0.5;
 	int area = cv::floodFill(tmp, maxPt, 0);
 
-	cv::threshold(tmp, tmp, 64, 255, CV_THRESH_BINARY);
+	cv::threshold(tmp, tmp, 64, 255, cv::THRESH_BINARY);
 
 	if (max == -1)
 		return in.clone();
@@ -270,7 +270,7 @@ void get_cell_contents(Sudoku& sudoku) {
 	cv::Mat img;
 	cv::Mat threshed;
 	cv::GaussianBlur(sudoku.aligned, img, { 5,5 }, 1);
-	cv::adaptiveThreshold(img, img, 255, CV_ADAPTIVE_THRESH_GAUSSIAN_C, CV_THRESH_BINARY, 11, 2);
+	cv::adaptiveThreshold(img, img, 255, cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, 11, 2);
 	cv::medianBlur(img, img, 3);
 
 

@@ -29,14 +29,15 @@ static bool is_valid_value(std::vector<std::vector<int>> board, size_t row, size
 	const size_t col_start = col - col % block_size;
 
 	for (size_t i = 0; i < S; i++) {
-		if (board[row][i] == value) false; // check row
-		if (board[i][col] == value) false; // check col
+		if (board[row][i] == value) return false; // check row
+		if (board[i][col] == value) return false; // check col
 	}
 	for (size_t r = 0; r < block_size; r++) {
 		for (size_t c = 0; c < block_size; c++) {
 			if (board[row_start + r][col_start + c] == value) return false; // check block
 		}
 	}
+	return true;
 }
 
 static void solveImpl(std::vector<std::vector<int>> board, size_t pos) {
