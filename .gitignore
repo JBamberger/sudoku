@@ -6,6 +6,7 @@ out/
 bin/
 build/
 cmake-build-*/
+data/
 
 *.o
 *.exe
