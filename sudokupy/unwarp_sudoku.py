@@ -1,9 +1,12 @@
 import cv2 as cv
 import numpy as np
+import torch
 
-from detection_utils import in_resize
+from detection_utils import in_resize, detect_sudoku
 from gt_annotator import read_ground_truth
 import random as rng
+
+import torch.nn.functional as F
 
 
 def show(img, name='Image'):
@@ -11,98 +14,41 @@ def show(img, name='Image'):
     cv.waitKey()
 
 
-def detect_sudoku(sudoku_img):
-    # conversion to gray
-    sudoku_gray = cv.cvtColor(sudoku_img, cv.COLOR_BGR2GRAY)
+def coarse_unwarp(image, poly_coords):
+    h, w, _ = image.shape
+    img_tensor = torch.from_numpy(image).permute(2, 0, 1).unsqueeze(0).float()
 
-    # Lightness normalization with morphological closing operation (basically subtracts background color)
-    kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, ksize=(25, 25))
-    closing = cv.morphologyEx(sudoku_gray, cv.MORPH_CLOSE, kernel)
-    sudoku_gray = (sudoku_gray / closing * 255).astype(np.uint8)
+    grid = torch.tensor(poly_coords).float().view(4, 2)
 
-    # sudoku_bin = cv.GaussianBlur(sudoku_gray, (5, 5), 0)
-    # sudoku_bin = cv.adaptiveThreshold(
-    #     sudoku_bin, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, blockSize=21, C=127)
+    # Swap the last two coordinates to obtain a valid grid when reshaping
+    grid = grid[[0, 1, 3, 2]]
 
-    # Inverse binarization with OTSU to find best threshold automatically (lines should be 1, background 0)
-    threshold, sudoku_bin = cv.threshold(sudoku_gray, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU)
+    # Transform coordinates to range [-1, 1]
+    grid[:, 0] /= w
+    grid[:, 1] /= h
+    grid -= 0.5
+    grid *= 2.0
 
-    # sudoku_bin = cv.medianBlur(sudoku_bin, 5)
+    # Interpolate grid to full output size
+    grid = grid.view(1, 2, 2, 2).permute(0, 3, 1, 2)  # order as [1, 2, H, W]
+    grid = F.interpolate(grid, (1024, 1024), mode='bilinear', align_corners=True)
 
-    # Dilation to enlarge the binarized structures slightly (fix holes in lines etc.)
-    # Must be careful not to over-dilate, otherwise sudoku can merge with surroundings -> bad bbox/contour
-    dilation_kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (5, 5))
-    dilated = cv.dilate(sudoku_bin, dilation_kernel)
+    # compute interpolated output image
+    grid = grid.permute(0, 2, 3, 1)  # Order as [1, H, W, 2]
+    aligned_img = F.grid_sample(img_tensor, grid, mode='bilinear', align_corners=False)
 
-    # show(dilated)
+    # back to numpy uint8
+    interp_img = aligned_img.squeeze(0).permute(1, 2, 0).to(dtype=torch.uint8).numpy()
 
-    def squared_p2p_dist(p1, p2):
-        dx = p1[0] - p2[0]
-        dy = p1[1] - p2[1]
-        return dx * dx + dy * dy
-
-    image_center = (int(round(sudoku_img.shape[1] / 2)), int(round(sudoku_img.shape[0] / 2)))
-
-    # Finding the largest contour (should be the sudoku)
-    contours, hierarchy = cv.findContours(dilated, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
-    max_area = 0
-    max_index = -1
-    for i in range(len(contours)):
-        contour = contours[i]
-
-        # test if the image center is within the proposed region
-        polytest = cv.pointPolygonTest(contour, image_center, measureDist=False)
-        if polytest < 0:
-            continue
-
-        points = cv.boxPoints(cv.minAreaRect(contour))
-        a, b, c, d = points
-        d1 = squared_p2p_dist(a, b)
-        d2 = squared_p2p_dist(a, d)
-        # print(d1, ' ', d2)
-
-        square_thresh = (d1 + d2) / 2 * 0.5
-        square_diff = abs(d1 - d2)
-        if square_diff > square_thresh:
-            print(f'Not square {square_diff} {square_thresh}')
-            continue
-
-        # test if the contour is large enough
-        contour_area = cv.contourArea(contour, oriented=False)
-        if contour_area > max_area:
-            max_area = contour_area
-            max_index = i
-
-    if max_index < 0:
-        raise RuntimeError('Sudoku not found.')
-
-    points = cv.boxPoints(cv.minAreaRect(contours[max_index]))
-    #     a, b, c, d = points
-    #     d1 = squared_p2p_dist(a, b)
-    #     d2 = squared_p2p_dist(a, d)
-    #     print(d1, ' ', d2, ' ', abs(d1 - d2))
-
-    rect = np.array(points).reshape(4, 2).astype(np.int32)
-
-    # x, y, w, h = cv.boundingRect(contours[max_index])
-
-    # for i in range(len(contours)):
-    #     color = (rng.randint(0, 256), rng.randint(0, 256), rng.randint(0, 256))
-    #     cv.drawContours(sudoku_img, contours, i, color, 2, cv.LINE_8, hierarchy, 0)
-    # show(sudoku_img, name='contours')
-
-    # img = cv.rectangle(sudoku_img, (x, y), (x + w, y + h), (0, 255, 0), thickness=5)
-    # show(img, name='Bounds')
-
-    return rect
+    return interp_img
 
 
-annot = read_ground_truth(np.os.path.abspath('ground_truth_new.csv'))
+gt_annoatations = read_ground_truth(np.os.path.abspath('ground_truth_new.csv'))
 # sudoku_path = annot[0][0]
-sudoku_path = annot[18][0]
+# sudoku_path = annot[18][0]
 # sudoku_path = annot[28][0]
 
-for file_path, coords in annot:
+for file_path, coords in gt_annoatations:
     sudoku_img_org = cv.imread(file_path)
 
     # Scaling such that the longer side is 1024 px long
@@ -113,8 +59,23 @@ for file_path, coords in annot:
     image_center = (int(round(sudoku_img.shape[1] / 2)), int(round(sudoku_img.shape[0] / 2)))
     try:
         pred_location = detect_sudoku(sudoku_img)
+
+        try:
+            uw = coarse_unwarp(sudoku_img_org, pred_location / input_downscale)
+            show(uw, name='coarse_unwarp')
+        except Exception as e:
+            print(e)
+            print('Failed to unwarp')
+
         # cv.rectangle(canvas, p1, p2, (255, 0, 0), thickness=3)
         cv.polylines(canvas, [pred_location], True, (255, 0, 0), thickness=3)
+
+        for i in range(4):
+            cv.putText(canvas, 'ABCD'[i], tuple(pred_location[i, :]), cv.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255),
+                       thickness=2)
+
+
+
     except RuntimeError:
         cv.putText(canvas, 'FAILED TO DETECT', image_center, cv.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), thickness=3)
 
@@ -125,14 +86,6 @@ for file_path, coords in annot:
     cv.polylines(canvas, [coords], True, (0, 255, 0), thickness=3)
 
     show(canvas, name='Bounds')
-
-
-
-
-
-
-
-
 
 # sudoku_brightness_normalized
 
