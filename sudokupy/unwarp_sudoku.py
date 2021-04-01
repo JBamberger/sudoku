@@ -1,46 +1,13 @@
 import cv2 as cv
 import numpy as np
-import torch
 
-from detection_utils import in_resize, detect_sudoku
+from detection_utils import in_resize, detect_sudoku, coarse_unwarp, pad_contour
 from gt_annotator import read_ground_truth
-import random as rng
-
-import torch.nn.functional as F
 
 
 def show(img, name='Image'):
     cv.imshow(name, cv.resize(img, (1024, int(img.shape[0] / (img.shape[1] / 1024))), interpolation=cv.INTER_AREA))
     cv.waitKey()
-
-
-def coarse_unwarp(image, poly_coords):
-    h, w, _ = image.shape
-    img_tensor = torch.from_numpy(image).permute(2, 0, 1).unsqueeze(0).float()
-
-    grid = torch.tensor(poly_coords).float().view(4, 2)
-
-    # Swap the last two coordinates to obtain a valid grid when reshaping
-    grid = grid[[0, 1, 3, 2]]
-
-    # Transform coordinates to range [-1, 1]
-    grid[:, 0] /= w
-    grid[:, 1] /= h
-    grid -= 0.5
-    grid *= 2.0
-
-    # Interpolate grid to full output size
-    grid = grid.view(1, 2, 2, 2).permute(0, 3, 1, 2)  # order as [1, 2, H, W]
-    grid = F.interpolate(grid, (1024, 1024), mode='bilinear', align_corners=True)
-
-    # compute interpolated output image
-    grid = grid.permute(0, 2, 3, 1)  # Order as [1, H, W, 2]
-    aligned_img = F.grid_sample(img_tensor, grid, mode='bilinear', align_corners=False)
-
-    # back to numpy uint8
-    interp_img = aligned_img.squeeze(0).permute(1, 2, 0).to(dtype=torch.uint8).numpy()
-
-    return interp_img
 
 
 gt_annoatations = read_ground_truth(np.os.path.abspath('ground_truth_new.csv'))
@@ -62,6 +29,10 @@ for file_path, coords in gt_annoatations:
 
         try:
             uw = coarse_unwarp(sudoku_img_org, pred_location / input_downscale)
+            show(uw, name='coarse_unwarp')
+
+            padded_location = pad_contour(sudoku_img, pred_location)
+            uw = coarse_unwarp(sudoku_img_org, padded_location / input_downscale)
             show(uw, name='coarse_unwarp')
         except Exception as e:
             print(e)

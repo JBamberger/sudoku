@@ -1,5 +1,7 @@
 import numpy as np
 import cv2 as cv
+import torch
+from torch.nn import functional as F
 
 
 def in_resize(image, long_side=1024):
@@ -93,4 +95,57 @@ def detect_sudoku(sudoku_img):
     # img = cv.rectangle(sudoku_img, (x, y), (x + w, y + h), (0, 255, 0), thickness=5)
     # show(img, name='Bounds')
 
+    return rect
+
+
+def coarse_unwarp(image, poly_coords):
+    h, w, _ = image.shape
+    img_tensor = torch.from_numpy(image).permute(2, 0, 1).unsqueeze(0).float()
+
+    grid = torch.tensor(poly_coords).float().view(4, 2)
+
+    # Swap the last two coordinates to obtain a valid grid when reshaping
+    grid = grid[[0, 1, 3, 2]]
+
+    # Transform coordinates to range [-1, 1]
+    grid[:, 0] /= w
+    grid[:, 1] /= h
+    grid -= 0.5
+    grid *= 2.0
+
+    # Interpolate grid to full output size
+    grid = grid.view(1, 2, 2, 2).permute(0, 3, 1, 2)  # order as [1, 2, H, W]
+    grid = F.interpolate(grid, (1024, 1024), mode='bilinear', align_corners=True)
+
+    # compute interpolated output image
+    grid = grid.permute(0, 2, 3, 1)  # Order as [1, H, W, 2]
+    aligned_img = F.grid_sample(img_tensor, grid, mode='bilinear', align_corners=False)
+
+    # back to numpy uint8
+    interp_img = aligned_img.squeeze(0).permute(1, 2, 0).to(dtype=torch.uint8).numpy()
+
+    return interp_img
+
+
+def pad_contour(image, coords, padding=15):
+    img = np.zeros(image.shape[:2], dtype=np.uint8)
+
+    cv.fillPoly(img, [coords], color=(255,))
+
+    dilation_kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (padding * 2, padding * 2))
+    dilated = cv.dilate(img, dilation_kernel)
+
+    contours, hierarchy = cv.findContours(dilated, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
+
+    max_area = 0
+    max_index = 0
+    for i in range(len(contours)):
+        contour = contours[i]
+        contour_area = cv.contourArea(contour, oriented=False)
+        if contour_area > max_area:
+            max_area = contour_area
+            max_index = i
+
+    points = cv.boxPoints(cv.minAreaRect(contours[max_index]))
+    rect = np.array(points).reshape(4, 2).astype(np.int32)
     return rect
