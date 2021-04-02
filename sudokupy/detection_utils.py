@@ -1,7 +1,19 @@
+import math
+
 import numpy as np
 import cv2 as cv
 import torch
 from torch.nn import functional as F
+
+
+def squared_p2p_dist(p1, p2):
+    dx = p1[0] - p2[0]
+    dy = p1[1] - p2[1]
+    return dx * dx + dy * dy
+
+
+def p2p_dist(p1, p2):
+    return math.sqrt(squared_p2p_dist(p1, p2))
 
 
 def in_resize(image, long_side=1024):
@@ -37,11 +49,6 @@ def detect_sudoku(sudoku_img):
     dilated = cv.dilate(sudoku_bin, dilation_kernel)
 
     # show(dilated)
-
-    def squared_p2p_dist(p1, p2):
-        dx = p1[0] - p2[0]
-        dy = p1[1] - p2[1]
-        return dx * dx + dy * dy
 
     image_center = (int(round(sudoku_img.shape[1] / 2)), int(round(sudoku_img.shape[0] / 2)))
 

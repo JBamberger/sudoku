@@ -1,9 +1,10 @@
+import math
 import time
 
 import cv2 as cv
 import scipy.ndimage
 import numpy as np
-from detection_utils import in_resize, detect_sudoku, coarse_unwarp, pad_contour
+from detection_utils import in_resize, detect_sudoku, coarse_unwarp, pad_contour, p2p_dist
 from gt_annotator import read_ground_truth
 
 
@@ -13,11 +14,11 @@ def show(img, name='Image', no_wait=False):
         cv.waitKey()
 
 
-def find_gridpoints(image):
+def extract_cells(image):
     image = image.copy()
 
     sudoku = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
-    show(sudoku, name='Gray', no_wait=True)
+    # show(sudoku, name='Gray', no_wait=True)
 
     # erosion_kernel = cv.getStructuringElement(cv.MORPH_RECT, (5, 5))
     # sudoku = cv.erode(sudoku, erosion_kernel)
@@ -25,23 +26,22 @@ def find_gridpoints(image):
 
     kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, ksize=(21, 21))
     closing = cv.morphologyEx(sudoku, cv.MORPH_CLOSE, kernel)
-    show(closing, name='Closing', no_wait=True)
+    # show(closing, name='Closing', no_wait=True)
 
     sudoku = (sudoku / closing * 255).astype(np.uint8)
-    show(sudoku, name='GrayNorm', no_wait=True)
-
+    # show(sudoku, name='GrayNorm', no_wait=True)
 
     threshold, sudoku = cv.threshold(sudoku, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU)
-    show(sudoku, name='Binarized', no_wait=True)
+    # show(sudoku, name='Binarized', no_wait=True)
 
     sudoku = cv.medianBlur(sudoku, 3)
-    show(sudoku, name='Binarized+Median', no_wait=True)
+    # show(sudoku, name='Binarized+Median', no_wait=True)
 
     dilation_kernel = cv.getStructuringElement(cv.MORPH_RECT, (7, 7))
     sudoku = cv.dilate(sudoku, dilation_kernel)
-    show(sudoku, name='Dilated', no_wait=True)
+    # show(sudoku, name='Dilated', no_wait=True)
 
-    boxes = []
+    cells = []
     contours, hierarchy = cv.findContours(sudoku, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
     contour_canvas = image.copy()
     for i in range(len(contours)):
@@ -49,14 +49,106 @@ def find_gridpoints(image):
 
         box = np.array(cv.boxPoints(cv.minAreaRect(contours[i]))).astype(np.int32)
         area = cv.contourArea(box)
-        if 7000 <= area <= 13000:
-            boxes.append(box)
+        if 80 * 80 <= area <= 120 * 120:
+            center = box.mean(axis=0)
+            cells.append((center, box))
+            color = (0, 255, 0)
+        else:
+            color = (0, 0, 255)
 
         contours[i] = box.reshape((-1, 1, 2))
 
-        color = (0, 255, 0) if 7000 <= area <= 13000 else (0, 0, 255)
         cv.drawContours(contour_canvas, contours, i, color, 2, cv.LINE_8, hierarchy, 0)
+
+    # compute the cell graph
+    nodes = cells
+    edges = []
+    for i in range(len(nodes)):
+        node = nodes[i]
+        for j in range(len(nodes)):
+            if i == j:
+                continue
+
+            other = nodes[j]
+
+            p1 = node[0]
+            p2 = other[0]
+            dist = p2p_dist(p1, p2)
+
+            e1 = np.array([1, 0])
+            diff_norm = (p1 - p2) / dist
+            angle = np.arccos(np.dot(e1, diff_norm))
+
+            dd = math.pi / 8
+
+            mod_pi = angle % math.pi
+            if mod_pi <= dd or math.pi - dd <= mod_pi:
+                direction = 'h'
+            elif math.pi / 2 - dd <= mod_pi <= math.pi / 2 + dd:
+                direction = 'v'
+            else:
+                direction = None
+
+            if direction is not None and 80 <= dist <= 115:
+                edges.append((i, j, dist, angle, direction))
+
+    # visualization
+    for node_num, node in enumerate(nodes):
+        center = tuple(node[0].astype(np.int32))
+        cv.drawMarker(contour_canvas, center, (0, 255, 0))
+        cv.putText(contour_canvas, str(node_num), center, cv.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), thickness=2)
+
+    for edge in edges:
+        direction = edge[4]
+        p1 = tuple(nodes[edge[0]][0].astype(np.int32))
+        p2 = tuple(nodes[edge[1]][0].astype(np.int32))
+
+        color = (127, 0, 127) if direction == 'h' else (127, 127, 0)
+        cv.line(contour_canvas, p1, p2, color)
+
+    # find the first node
+    first_node = 0
+    changed = True
+    while changed:
+        changed = False
+        for edge in edges:
+            if edge[0] != first_node:
+                continue
+
+            node = nodes[first_node]
+            other = nodes[edge[1]]
+            orientation = edge[4]
+            if orientation == 'h' and node[0][0] > other[0][0] or orientation == 'v' and node[0][1] > other[0][1]:
+                first_node = edge[1]
+                changed = True
+                continue
+
+    cv.drawMarker(contour_canvas, tuple(nodes[first_node][0].astype(np.int32)), (0, 255, 255), markerSize=20,
+                  thickness=5)
+
+    edgemap = {i: [edge for edge in filter(lambda e: e[0] == i, edges)] for i in range(len(nodes))}
+
+    cell_to_node = np.zeros((9, 9), dtype=np.int32)
+    row_node = col_node = first_node
+    for i in range(9):
+        for j in range(9):
+            cell_to_node[i, j] = col_node
+
+            for edge in edgemap[col_node]:
+                if edge[4] == 'h' and nodes[col_node][0][0] < nodes[edge[1]][0][0]:
+                    col_node = edge[1]
+            # TODO: Detect failures here, i.e. when col_nodes didn't change
+
+        for edge in edgemap[row_node]:
+            if edge[4] == 'v' and nodes[row_node][0][1] < nodes[edge[1]][0][1]:
+                row_node = edge[1]
+                col_node = row_node
+        # TODO: Detect failures here, i.e. when row_node didn't change
+
+    print(cell_to_node)
+
     show(contour_canvas, name='Contours', no_wait=True)
+
 
     return
 
@@ -91,7 +183,7 @@ for file_path, coords in gt_annoatations:
         # unwarp from original image for best warp quality
         sudoku_coarse_unwarp = coarse_unwarp(sudoku_img_org, padded_location / input_downscale)
 
-        gridpoints = find_gridpoints(sudoku_coarse_unwarp)
+        gridpoints = extract_cells(sudoku_coarse_unwarp)
 
         # show(sudoku_coarse_unwarp, name='coarse_unwarp')
 
