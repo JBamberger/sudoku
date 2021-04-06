@@ -1,10 +1,12 @@
 import math
+import os
 import time
 
 import cv2 as cv
-import scipy.ndimage
 import numpy as np
-from detection_utils import in_resize, detect_sudoku, coarse_unwarp, pad_contour, p2p_dist
+
+from classifier import deskew, classify_digit
+from detection_utils import in_resize, detect_sudoku, unwarp_patch, pad_contour, p2p_dist
 from gt_annotator import read_ground_truth
 
 
@@ -13,6 +15,13 @@ def show(img, name='Image', no_wait=False):
     if not no_wait:
         cv.waitKey()
 
+
+gt_annoatations = read_ground_truth(np.os.path.abspath('ground_truth_new.csv'))
+
+
+# sudoku_path = annot[0][0]
+# sudoku_path = annot[18][0]
+# sudoku_path = annot[28][0]
 
 def extract_cells(image):
     image = image.copy()
@@ -64,14 +73,13 @@ def extract_cells(image):
     nodes = cells
     edges = []
     for i in range(len(nodes)):
-        node = nodes[i]
         for j in range(len(nodes)):
             if i == j:
                 continue
 
             other = nodes[j]
 
-            p1 = node[0]
+            p1 = nodes[i][0]
             p2 = other[0]
             dist = p2p_dist(p1, p2)
 
@@ -123,8 +131,8 @@ def extract_cells(image):
                 changed = True
                 continue
 
-    cv.drawMarker(contour_canvas, tuple(nodes[first_node][0].astype(np.int32)), (0, 255, 255), markerSize=20,
-                  thickness=5)
+    cv.drawMarker(contour_canvas, tuple(nodes[first_node][0].astype(np.int32)), (0, 255, 255),
+                  markerSize=20, thickness=5)
 
     edgemap = {i: [edge for edge in filter(lambda e: e[0] == i, edges)] for i in range(len(nodes))}
 
@@ -149,14 +157,39 @@ def extract_cells(image):
 
     show(contour_canvas, name='Contours', no_wait=True)
 
+    pad = 3
+    ps = 64
+    patch_size = (ps + 2 * pad, ps + 2 * pad)
 
-    return
+    cell_coords = np.zeros((81, 4, 2))
+    cell_patches = np.zeros((81, ps, ps, 3))
+    for i in range(81):
+        node_idx = cell_to_node.flatten()[i]
+        coordinates = nodes[node_idx][1]
 
+        x_ord = np.argsort(coordinates[:, 0])
+        coords = coordinates[x_ord]
 
-gt_annoatations = read_ground_truth(np.os.path.abspath('ground_truth_new.csv'))
-# sudoku_path = annot[0][0]
-# sudoku_path = annot[18][0]
-# sudoku_path = annot[28][0]
+        lower = coords[:2, :]
+        order = np.argsort(lower[:, 1])[::-1]
+        lower = lower[order]
+
+        upper = coords[2:, :]
+        order = np.argsort(upper[:, 1])
+        upper = upper[order]
+
+        coordinates[:2, :] = lower
+        coordinates[2:, :] = upper
+
+        coordinates = coordinates[[1,2,3,0]]
+
+        padded_cell_patch = unwarp_patch(image, coordinates, out_size=patch_size)
+
+        cell_coords[i, :, :] = coords
+        cell_patches[i, :, :, :] = padded_cell_patch[pad:pad + ps, pad:pad + ps]
+
+    return cell_patches, cell_coords
+
 
 for file_path, coords in gt_annoatations:
     start = time.time()
@@ -181,9 +214,44 @@ for file_path, coords in gt_annoatations:
         padded_location = np.roll(padded_location, shift=2, axis=0)
 
         # unwarp from original image for best warp quality
-        sudoku_coarse_unwarp = coarse_unwarp(sudoku_img_org, padded_location / input_downscale)
+        sudoku_coarse_unwarp, crop_grid = unwarp_patch(sudoku_img_org, padded_location / input_downscale,
+                                                       return_grid=True)
+        crop_grid *= input_downscale
 
-        gridpoints = extract_cells(sudoku_coarse_unwarp)
+        cell_images, cell_coords = extract_cells(sudoku_coarse_unwarp)
+        cell_images = cell_images.astype(np.uint8)
+
+        out = np.zeros((81,), dtype=np.int32)
+        for i in range(81):
+            cell_patch = cell_images[i, :, :, :]
+            gray_cell = cv.cvtColor(cell_patch, cv.COLOR_BGR2GRAY)
+            # deskewed_cell = deskew(gray_cell)
+
+            pad = 6
+            _, pt = cv.threshold(gray_cell[pad:-pad, pad:-pad], 100, 255, cv.THRESH_BINARY_INV)
+            if np.count_nonzero(pt) > 50:
+                out[i] = classify_digit(gray_cell)
+            else:
+                out[i] = -1
+
+            # _, pt = cv.threshold(gray_cell, 100, 255, cv.THRESH_BINARY_INV)
+            # nnz = np.count_nonzero(pt)
+            #
+            # cell_path = os.path.join('extracted_digits',
+            #                          f'{nnz:08d}_{os.path.splitext(os.path.basename(file_path))[0]}_{i}.jpg')
+            # cv.imwrite(cell_path, cell_patch)
+
+            cell_center = cell_coords[i, :, :].mean(0).astype(np.int32)
+            cell_center = crop_grid[0, cell_center[1].item(), cell_center[0].item(), :].astype(np.int32)
+            cell_center = (cell_center[0].item(), cell_center[1].item())
+
+            # translate from cropping
+
+            cv.putText(canvas, str(out[i]), cell_center, cv.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), thickness=2)
+            # cv.drawMarker(canvas, cell_center, (0, 255, 0))
+
+        out = out.reshape((9, 9))
+        print(out)
 
         # show(sudoku_coarse_unwarp, name='coarse_unwarp')
 

@@ -6,6 +6,9 @@ import torch
 from torch.nn import functional as F
 
 
+# from unwarp_sudoku import show
+
+
 def squared_p2p_dist(p1, p2):
     dx = p1[0] - p2[0]
     dy = p1[1] - p2[1]
@@ -105,7 +108,7 @@ def detect_sudoku(sudoku_img):
     return rect
 
 
-def coarse_unwarp(image, poly_coords):
+def unwarp_patch(image, poly_coords, out_size=(1024, 1024), return_grid=False):
     h, w, _ = image.shape
     img_tensor = torch.from_numpy(image).permute(2, 0, 1).unsqueeze(0).float()
 
@@ -122,7 +125,7 @@ def coarse_unwarp(image, poly_coords):
 
     # Interpolate grid to full output size
     grid = grid.view(1, 2, 2, 2).permute(0, 3, 1, 2)  # order as [1, 2, H, W]
-    grid = F.interpolate(grid, (1024, 1024), mode='bilinear', align_corners=True)
+    grid = F.interpolate(grid, out_size, mode='bilinear', align_corners=True)
 
     # compute interpolated output image
     grid = grid.permute(0, 2, 3, 1)  # Order as [1, H, W, 2]
@@ -130,6 +133,14 @@ def coarse_unwarp(image, poly_coords):
 
     # back to numpy uint8
     interp_img = aligned_img.squeeze(0).permute(1, 2, 0).to(dtype=torch.uint8).numpy()
+
+    if return_grid:
+        grid /= 2.0
+        grid += 0.5
+        grid[:, :, :, 0] *= w
+        grid[:, :, :, 1] *= h
+
+        return interp_img, grid.numpy()
 
     return interp_img
 

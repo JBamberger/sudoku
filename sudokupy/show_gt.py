@@ -7,6 +7,9 @@ annot = read_ground_truth(np.os.path.abspath('ground_truth_new.csv'))
 for file_name, coords in annot:
     coords = np.array(coords).reshape(4, 2)
     img = cv.imread(file_name, cv.IMREAD_COLOR)
+
+    print(f'{file_name}, Shape: {img.shape}')
+
     img = cv.polylines(img, [coords], True, (0, 255, 0), thickness=5)
 
     h, w = img.shape[:2]
