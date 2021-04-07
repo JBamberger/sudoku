@@ -1,16 +1,19 @@
-from utils import read_ground_truth
-import numpy as np
 import cv2 as cv
+import numpy as np
 
-annot = read_ground_truth(np.os.path.abspath('ground_truth.txt'))
+from utils import rotation_correction, read_ground_truth
 
-for file_name, coords in annot:
-    coords = np.array(coords).reshape(4, 2)
+for file_name, coords in read_ground_truth(np.os.path.abspath('ground_truth_new.csv')):
     img = cv.imread(file_name, cv.IMREAD_COLOR)
+
+    img, coords = rotation_correction(img, coords)
 
     print(f'{file_name}, Shape: {img.shape}')
 
     img = cv.polylines(img, [coords], True, (0, 255, 0), thickness=5)
+
+    cv.line(img, tuple(coords[0, :]), tuple(coords[1, :]), (255, 0, 255), thickness=10)
+    cv.line(img, tuple(coords[1, :]), tuple(coords[2, :]), (255, 255, 0), thickness=10)
 
     h, w = img.shape[:2]
     cx = int(round(w / 2))

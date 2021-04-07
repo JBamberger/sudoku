@@ -119,8 +119,6 @@ class Net(nn.Module):
 
         # TODO: postprocess patches
 
-        print(result.shape)
-
         result = torch.argmax(result, dim=1)
 
         return result + 1

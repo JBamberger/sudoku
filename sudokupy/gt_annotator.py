@@ -1,7 +1,7 @@
-import torch
+import os
+
 import cv2 as cv
 import numpy as np
-import os
 
 from utils import read_ground_truth
 
@@ -171,11 +171,8 @@ def annotate_bounding_poly():
 
 
 def fix_annotations():
-    gt_file = os.path.abspath('ground_truth.csv')
-    annotations = read_ground_truth(gt_file)
-
     with open('ground_truth_new.csv', 'w', encoding='utf8') as f:
-        for file_path, coords in annotations:
+        for file_path, coords in read_ground_truth(os.path.abspath('ground_truth.csv')):
             sudoku_ori = cv.imread(file_path, cv.IMREAD_COLOR)
 
             large = sudoku_ori.copy()
@@ -184,7 +181,7 @@ def fix_annotations():
             scale_x = large.shape[1] / small.shape[1]
             scale_y = large.shape[0] / small.shape[0]
 
-            polyline = np.array(coords).reshape(4, 2).astype(np.float32)
+            polyline = coords.astype(np.float32)
 
             # reverse scale_up function
             polyline = polyline / scale_y
@@ -202,10 +199,8 @@ def fix_annotations():
 
 
 def rename_sudokus():
-    annotations = read_ground_truth(os.path.abspath('ground_truth.txt'))
-
     with open('ground_truth.renamed.txt', 'w', encoding='utf8') as f:
-        for i, (file_path, coords) in enumerate(annotations):
+        for i, (file_path, coords) in enumerate(read_ground_truth(os.path.abspath('ground_truth.txt'))):
             i += 31
             new_path = os.path.join(os.path.dirname(file_path), f'sudoku_{i:d}.jpg')
 
@@ -214,10 +209,11 @@ def rename_sudokus():
 
             os.rename(file_path, new_path)
 
-            cells = [new_path] + [str(a) for a in coords]
+            cells = [new_path] + [str(a) for a in coords.flatten()]
             line = ', '.join(cells) + '\n'
             print(line, end='')
             f.write(line)
+
 
 if __name__ == '__main__':
     annotate_bounding_poly()

@@ -3,21 +3,20 @@ import os
 import cv2 as cv
 import numpy as np
 
-from utils import read_ground_truth
 from sudoku_detector import SudokuDetector
+from utils import read_ground_truth
 
 
 def eval_detector():
     annotations = read_ground_truth(os.path.abspath('ground_truth_new.csv'))
     detector = SudokuDetector()
 
-    for name, points in annotations:
-        image = cv.imread(name, cv.IMREAD_COLOR)
+    for file_path, coords in annotations:
+        image = cv.imread(file_path, cv.IMREAD_COLOR)
         sudoku_gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
         sudoku_ori = image.copy()
         sudoku = detector.detect_sudoku(sudoku_gray)
 
-        coords = np.array(points).reshape(4, 2).astype(np.int32)
         poly = cv.polylines(sudoku_ori.copy(), [coords], True, (0, 255, 0), thickness=5)
 
         pred_coords = sudoku.corners.as_array().astype(np.int32)

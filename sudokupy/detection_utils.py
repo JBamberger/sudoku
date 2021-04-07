@@ -8,6 +8,11 @@ from torch.nn import functional as F
 
 # from unwarp_sudoku import show
 
+class SudokuNotFoundException(Exception):
+
+    def __init__(self, *args: object) -> None:
+        super().__init__(*args)
+
 
 def squared_p2p_dist(p1, p2):
     dx = p1[0] - p2[0]
@@ -85,7 +90,7 @@ def detect_sudoku(sudoku_img):
             max_index = i
 
     if max_index < 0:
-        raise RuntimeError('Sudoku not found.')
+        raise SudokuNotFoundException('Sudoku not found.')
 
     points = cv.boxPoints(cv.minAreaRect(contours[max_index]))
     #     a, b, c, d = points

@@ -40,14 +40,12 @@ def extract_digit_samples():
     if not os.path.isdir(out_dir):
         os.mkdir(out_dir)
 
-    annotations = read_ground_truth(gt_file)
-
-    for file_path, coords in annotations:
+    for file_path, coords in read_ground_truth(gt_file):
         sudoku_ori = cv.imread(file_path, cv.IMREAD_COLOR)
 
         sudoku = torch.from_numpy(sudoku_ori).permute((2, 0, 1)).unsqueeze(0).float()
 
-        coords = np.array(coords).reshape(4, 2).astype(np.int32)
+        coords = coords.astype(np.int32)
 
         grid = create_rect_grid2(sudoku, coords, in_size=sudoku.shape[2:], out_size=[512, 512])
         aligned_sudoku = F.grid_sample(sudoku, grid, mode='bilinear', align_corners=False)
