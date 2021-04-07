@@ -5,8 +5,9 @@ import cv2 as cv
 import torch
 from torch.nn import functional as F
 
-
 # from unwarp_sudoku import show
+from utils import oriented_angle
+
 
 class SudokuNotFoundException(Exception):
 
@@ -100,6 +101,8 @@ def detect_sudoku(sudoku_img):
 
     rect = np.array(points).reshape(4, 2).astype(np.int32)
 
+    rect = normalize_rect_orientation(rect)
+
     # x, y, w, h = cv.boundingRect(contours[max_index])
 
     # for i in range(len(contours)):
@@ -109,6 +112,33 @@ def detect_sudoku(sudoku_img):
 
     # img = cv.rectangle(sudoku_img, (x, y), (x + w, y + h), (0, 255, 0), thickness=5)
     # show(img, name='Bounds')
+
+    return rect
+
+
+def normalize_rect_orientation(rect):
+    assert rect.shape[0] == 4 and rect.shape[1] == 2
+
+    # Ordering the indices by x and y coordinates, then taking the lower 2 values each
+    lower_xy = np.concatenate([np.argsort(rect[:, 0])[:2], np.argsort(rect[:, 1])[:2]], axis=0)
+
+    # Find the value which appears two times, i.e. being in the lower 2 values for x and y direction. There can only be
+    # one, unless the rect is malformed (e.g. all points are the same) or at an angle of exactly 45deg. In the latter
+    # case it is impossible to determine the correct orientation, thus an arbitrary choice is made.
+    values, counts = np.unique(lower_xy, return_counts=True)
+    ind = np.argmax(counts)
+    ul_idx = values[ind]
+
+    # Shift the coordinates to the correct position, such that the upper left corner is the first coordinate
+    rect = np.roll(rect, shift=-ul_idx, axis=0)
+
+    # oriented angle to e1
+    angle = oriented_angle(rect[1, 0] - rect[0, 0], rect[1, 1] - rect[0, 1], 1, 0) / np.pi * 180
+    # if the angle between the first rect side and the x axis is not between -45 and 45 the rectangle points are the
+    # wrong way around. Flipping the coordinate order and shifting by 1 to bring the first coordinate back to pos 0
+    # fixes the problem.
+    if not (-45.0 <= angle <= 45.0):
+        rect = np.roll(rect[::-1, :], shift=1, axis=0)
 
     return rect
 
@@ -171,4 +201,4 @@ def pad_contour(image, coords, padding=15):
 
     points = cv.boxPoints(cv.minAreaRect(contours[max_index]))
     rect = np.array(points).reshape(4, 2).astype(np.int32)
-    return rect
+    return normalize_rect_orientation(rect)

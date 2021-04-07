@@ -47,7 +47,18 @@ CCW180 = np.array([[-1, 0], [0, -1]])
 CCW270 = np.array([[0, 1], [-1, 0]])
 
 
-def oriented_angle(x1, x2, y1, y2):
+def angle_to_e1(x1, y1):
+    return vec_angle(x1, y1, 1, 0)
+
+
+def vec_angle(x1, y1, x2, y2):
+    v1_len = math.sqrt(x1 * x1 + y1 * y1)
+    v2_len = math.sqrt(x2 * x2 + y2 * y2)
+    n = v1_len * v2_len
+    return math.acos(x1 * x2 / n + y1 * y2 / n)
+
+
+def oriented_angle(x1, y1, x2, y2):
     dot = x1 * x2 + y1 * y2
     det = x1 * y2 - y1 * x2
     angle = math.atan2(det, dot)
@@ -58,7 +69,7 @@ def rotation_correction(img, coords) -> Tuple[np.ndarray, np.ndarray]:
     # angle between upper border (reading direction) and e1
     x1, y1 = coords[1, :] - coords[0, :]
     x2, y2 = 1, 0
-    angle = oriented_angle(x1, x2, y1, y2)
+    angle = oriented_angle(x1, y1, x2, y2)
     angle_deg = angle / np.pi * 180
 
     if -45.0 <= angle_deg <= 45.0:

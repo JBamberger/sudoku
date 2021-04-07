@@ -288,9 +288,6 @@ for sudoku_index, (file_path, gt_coords) in enumerate(gt_annoatations):
     # add padding to compensate for bounding boxes that fit too tight
     padded_location = pad_contour(sudoku_img, pred_location)
 
-    # TODO: replace with actual orientation detection
-    padded_location = np.roll(padded_location, shift=2, axis=0)
-
     # unwarp from original image for best warp quality
     scaled_locations = padded_location / input_downscale
     sudoku_coarse_unwarp, crop_grid = unwarp_patch(sudoku_img_org, scaled_locations, return_grid=True)
