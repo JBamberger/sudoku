@@ -2,7 +2,7 @@ from utils import read_ground_truth
 import numpy as np
 import cv2 as cv
 
-annot = read_ground_truth(np.os.path.abspath('ground_truth_new.csv'))
+annot = read_ground_truth(np.os.path.abspath('ground_truth.txt'))
 
 for file_name, coords in annot:
     coords = np.array(coords).reshape(4, 2)

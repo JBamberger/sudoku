@@ -23,7 +23,6 @@ class PolygonSelector:
         self.points_changed()
 
     def loop(self):
-
         while True:
             key = cv.waitKey()
             # print(key)
@@ -132,6 +131,35 @@ def scale_up(large, small, point):
     return int(round(point[0] * sf)), int(round(point[1] * sf))
 
 
+def scale_up_polyline(large, small, points):
+    polyline = points.astype(np.float32)
+
+    polyline[:, 0] *= large.shape[1] / small.shape[1]
+    polyline[:, 1] *= large.shape[0] / small.shape[0]
+
+    polyline = polyline.round().astype(np.int32)
+
+    return polyline
+
+
+def annotate_sudoku_file(file):
+    sudoku_img_ori = cv.imread(file, cv.IMREAD_COLOR)
+
+    sudoku_img = scale_down(sudoku_img_ori)
+
+    # roi = cv.selectROI("Image", sudoku_img, showCrosshair=True, fromCenter=False)
+    selector = PolygonSelector("Image", sudoku_img, 4)
+    roi = selector.loop()
+
+    roi = scale_up_polyline(sudoku_img_ori, sudoku_img, np.array(roi).reshape(4, 2))
+    print(roi)
+
+    cells = [file] + [str(a) for a in roi.flatten()]
+
+    line = ', '.join(cells) + '\n'
+    return line
+
+
 def annotate_bounding_poly():
     with open('ground_truth.txt', 'w', encoding='utf8') as f:
         for i, file in enumerate(sudoku_files):
@@ -142,22 +170,6 @@ def annotate_bounding_poly():
             f.write(line)
 
 
-def annotate_sudoku_file(file):
-    sudoku_img_ori = cv.imread(file, cv.IMREAD_COLOR)
-    sudoku_img = scale_down(sudoku_img_ori)
-    # roi = cv.selectROI("Image", sudoku_img, showCrosshair=True, fromCenter=False)
-    selector = PolygonSelector("Image", sudoku_img, 4)
-    roi = selector.loop()
-
-    roi = list(map(lambda p: scale_up(sudoku_img_ori, sudoku_img, p), roi))
-    print(roi)
-
-    cells = [file] + [str(a) for point in roi for a in point]
-
-    line = ', '.join(cells) + '\n'
-    return line
-
-
 def fix_annotations():
     gt_file = os.path.abspath('ground_truth.csv')
     annotations = read_ground_truth(gt_file)
@@ -166,38 +178,48 @@ def fix_annotations():
         for file_path, coords in annotations:
             sudoku_ori = cv.imread(file_path, cv.IMREAD_COLOR)
 
-            sudoku = torch.from_numpy(sudoku_ori).permute((2, 0, 1)).unsqueeze(0).float()
-
-            _, _, H_in, W_in = sudoku.shape
-
-            H_out = 256
-            W_out = 256
-            # [N, H_out, W_out, 2]
-            grid = torch.zeros((1, H_out, W_out, 2))
-
-            ul = coords[0:2]
-            ur = coords[2:4]
-            br = coords[4:6]
-            bl = coords[6:8]
-
             large = sudoku_ori.copy()
             small = scale_down(large)
 
-            polyline = np.array([ul, ur, br, bl]).astype(np.float32)
-            polyline2 = polyline / (large.shape[0] / small.shape[0])
+            scale_x = large.shape[1] / small.shape[1]
+            scale_y = large.shape[0] / small.shape[0]
 
-            polyline[:, 0] = polyline2[:, 0] * large.shape[1] / small.shape[1]
-            polyline[:, 1] = polyline2[:, 1] * large.shape[0] / small.shape[0]
+            polyline = np.array(coords).reshape(4, 2).astype(np.float32)
+
+            # reverse scale_up function
+            polyline = polyline / scale_y
+
+            # perform correct scaling
+            polyline[:, 0] *= scale_x
+            polyline[:, 1] *= scale_y
 
             polyline = polyline.round().astype(np.int32)
 
             cells = [file_path] + [str(a) for a in polyline.flatten()]
-
             line = ', '.join(cells) + '\n'
             print(line, end='')
             f.write(line)
 
 
+def rename_sudokus():
+    annotations = read_ground_truth(os.path.abspath('ground_truth.txt'))
+
+    with open('ground_truth.renamed.txt', 'w', encoding='utf8') as f:
+        for i, (file_path, coords) in enumerate(annotations):
+            i += 31
+            new_path = os.path.join(os.path.dirname(file_path), f'sudoku_{i:d}.jpg')
+
+            if os.path.exists(new_path):
+                raise RuntimeError()
+
+            os.rename(file_path, new_path)
+
+            cells = [new_path] + [str(a) for a in coords]
+            line = ', '.join(cells) + '\n'
+            print(line, end='')
+            f.write(line)
+
 if __name__ == '__main__':
     annotate_bounding_poly()
-    fix_annotations()
+    # fix_annotations()
+    # rename_sudokus()
