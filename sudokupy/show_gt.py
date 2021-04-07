@@ -1,4 +1,4 @@
-from gt_annotator import read_ground_truth
+from utils import read_ground_truth
 import numpy as np
 import cv2 as cv
 

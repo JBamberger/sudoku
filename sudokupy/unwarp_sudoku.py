@@ -7,7 +7,7 @@ import numpy as np
 
 from classifier import deskew, classify_digit
 from detection_utils import in_resize, detect_sudoku, unwarp_patch, pad_contour, p2p_dist
-from gt_annotator import read_ground_truth
+from utils import read_ground_truth
 
 
 def show(img, name='Image', no_wait=False):
