@@ -87,17 +87,32 @@ def locate_sudoku_contour(contours, sudoku_img):
 
     max_ct = contours[max_index]
 
-    epsilon = 0.1 * cv.arcLength(max_ct, closed=True)
-    points = cv.approxPolyDP(max_ct, epsilon, closed=True)
+    points = approx_quad(max_ct)
+
+    return points
+
+
+def approx_quad(points, normalize_orientation=True):
+    """
+    Approximates a contour or points with four corner points.
+
+    :param points: points of the shape [N,1,2]
+    :param normalize_orientation: True to normalize the orientation, i.e. first point is upper left, CW order.
+    :return: quad corner points of shape [4, 2]
+    """
+    epsilon = 0.1 * cv.arcLength(points, closed=True)
+    points = cv.approxPolyDP(points, epsilon, closed=True)
 
     if points.shape[0] != 4:
         print('Could not approx. sudoku shape with quad.')
-        points = cv.minAreaRect(max_ct)
+        points = cv.minAreaRect(points)
         points = cv.boxPoints(points)
         points = np.array(points)
 
     points = points.reshape(4, 2).astype(np.int32)
-    points = normalize_rect_orientation(points)
+
+    if normalize_orientation:
+        points = normalize_rect_orientation(points)
 
     return points
 
@@ -140,9 +155,15 @@ def unwarp_patch(image, poly_coords, out_size=(1024, 1024), return_grid=False):
 
 
 def pad_contour(coords, padding=15):
+    """
+    Pad the coordinates, such that the point is projected on the line through the center and point.
+    Negative values pad inwards, shrinking the contour and positive values pad outwards, growing the contour.
 
+    :param coords: input coordinates of shape [N,2]
+    :param padding: amount of padding to apply to the coordinates.
+    :return: padded contour of shape [N,2]
+    """
     center = coords.mean(axis=0)
-
     for i in range(len(coords)):
         vec = coords[i, :] - center
         sum_sq = np.sum(vec * vec)
@@ -152,26 +173,6 @@ def pad_contour(coords, padding=15):
         coords[i, :] = center + c * vec
 
     return coords.astype(np.int32)
-
-    # img = np.zeros(image.shape[:2], dtype=np.uint8)
-    # cv.fillPoly(img, [coords], color=(255,))
-    # dilation_kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (padding * 2, padding * 2))
-    # dilated = cv.dilate(img, dilation_kernel)
-    #
-    # contours, hierarchy = cv.findContours(dilated, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
-    #
-    # max_area = 0
-    # max_index = 0
-    # for i in range(len(contours)):
-    #     contour = contours[i]
-    #     contour_area = cv.contourArea(contour, oriented=False)
-    #     if contour_area > max_area:
-    #         max_area = contour_area
-    #         max_index = i
-    #
-    # points = cv.boxPoints(cv.minAreaRect(contours[max_index]))
-    # rect = np.array(points).reshape(4, 2).astype(np.int32)
-    # return normalize_rect_orientation(rect)
 
 
 def extract_cells(image):
@@ -183,7 +184,9 @@ def extract_cells(image):
     for i in range(len(contours)):
         # contours[i] = cv.convexHull(contours[i])
 
-        box = np.array(cv.boxPoints(cv.minAreaRect(contours[i]))).astype(np.int32)
+        box = approx_quad(contours[i])
+        # box = np.array(cv.boxPoints(cv.minAreaRect(contours[i]))).astype(np.int32)
+
         area = cv.contourArea(box)
         if 80 * 80 <= area <= 120 * 120:
             center = box.mean(axis=0)
@@ -209,6 +212,11 @@ def extract_cells(image):
     cell_patches = np.zeros((81, ps, ps, 3))
     for i in range(81):
         node_idx = cell_to_node.flatten()[i]
+        if node_idx < 0:
+            cell_coords[i, :, :] = -1
+            continue
+
+
         coordinates = cells[node_idx][1]
 
         x_ord = np.argsort(coordinates[:, 0])
@@ -253,7 +261,10 @@ def compute_cell2node_mapping_fast(cells, contour_canvas):
             print(f'Cell at ({i},{j}) already occupied by {mapping[j][i]}')
 
     for i in range(81):
-        cx, cy = cells[mapping.flatten()[i]][0]
+        cell_idx = mapping.flatten()[i]
+        if cell_idx < 0:
+            continue
+        cx, cy = cells[cell_idx][0]
         center = (int(cx), int(cy))
         cv.putText(contour_canvas, str(i), center, cv.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), thickness=2)
         cv.drawMarker(contour_canvas, center, (0, 255, 255))
