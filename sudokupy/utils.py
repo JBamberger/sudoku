@@ -4,6 +4,7 @@ from typing import Tuple
 import cv2 as cv
 import numpy as np
 import torch
+from skimage.filters import threshold_sauvola
 from torch.nn import functional as F
 
 
@@ -16,6 +17,16 @@ def read_ground_truth(gt_file):
             pair = (fields[0], coords)
             annotations.append(pair)
     return annotations
+
+
+def squared_p2p_dist(p1, p2):
+    dx = p1[0] - p2[0]
+    dy = p1[1] - p2[1]
+    return dx * dx + dy * dy
+
+
+def p2p_dist(p1, p2):
+    return math.sqrt(squared_p2p_dist(p1, p2))
 
 
 def gaussian2d(sigma, sz):
@@ -42,13 +53,10 @@ def compute_gradients(image):
     return dx, dy
 
 
+# Matrices to rotate 2D coordinates
 CCW90 = np.array([[0, -1], [1, 0]])
 CCW180 = np.array([[-1, 0], [0, -1]])
 CCW270 = np.array([[0, 1], [-1, 0]])
-
-
-def angle_to_e1(x1, y1):
-    return vec_angle(x1, y1, 1, 0)
 
 
 def vec_angle(x1, y1, x2, y2):
@@ -97,3 +105,60 @@ def rotation_correction(img, coords) -> Tuple[np.ndarray, np.ndarray]:
     # print(f'Angle: {angle_deg:>6.02f}')
 
     return img, coords
+
+
+def normalize_rect_orientation(rect):
+    assert rect.shape[0] == 4 and rect.shape[1] == 2
+
+    # Ordering the indices by x and y coordinates, then taking the lower 2 values each
+    lower_xy = np.concatenate([np.argsort(rect[:, 0])[:2], np.argsort(rect[:, 1])[:2]], axis=0)
+
+    # Find the value which appears two times, i.e. being in the lower 2 values for x and y direction. There can only be
+    # one, unless the rect is malformed (e.g. all points are the same) or at an angle of exactly 45deg. In the latter
+    # case it is impossible to determine the correct orientation, thus an arbitrary choice is made.
+    ul_idx = np.bincount(lower_xy).argmax()
+
+    # Shift the coordinates to the correct position, such that the upper left corner is the first coordinate
+    rect = np.roll(rect, shift=-ul_idx, axis=0)
+
+    # oriented angle to e1
+    angle = oriented_angle(rect[1, 0] - rect[0, 0], rect[1, 1] - rect[0, 1], 1, 0) / np.pi * 180
+    # if the angle between the first rect side and the x axis is not between -45 and 45 the rectangle points are the
+    # wrong way around. Flipping the coordinate order and shifting by 1 to bring the first coordinate back to pos 0
+    # fixes the problem.
+    if not (-45.0 <= angle <= 45.0):
+        rect = np.roll(rect[::-1, :], shift=1, axis=0)
+
+    return rect
+
+
+def adaptiveThresh(image, lower, upper):
+    assert lower < upper
+
+    adapt = cv.adaptiveThreshold(image, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY_INV, 701, C=2)
+    show(adapt, name='Binarized', no_wait=True)
+
+    lowerimg = np.zeros_like(adapt)
+    lowerimg[image < lower] = 255
+    show(lowerimg, name='lower', no_wait=True)
+
+    upperimg = np.zeros_like(adapt)
+    upperimg[image > upper] = 255
+    show(upperimg, name='upperimg')
+
+    adapt[image < lower] = 255
+    adapt[image > upper] = 0
+
+    return adapt
+
+
+def thresh_savoula(image, window_size=15, k=0.2):
+    threshold = threshold_sauvola(image, window_size=window_size, k=k)
+    image = (image < threshold).astype(np.uint8) * 255
+    return image
+
+
+def show(img, name='Image', no_wait=False):
+    cv.imshow(name, cv.resize(img, (1024, int(img.shape[0] / (img.shape[1] / 1024))), interpolation=cv.INTER_AREA))
+    if not no_wait:
+        cv.waitKey()

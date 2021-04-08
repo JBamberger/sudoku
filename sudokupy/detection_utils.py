@@ -5,24 +5,13 @@ import cv2 as cv
 import torch
 from torch.nn import functional as F
 
-# from unwarp_sudoku import show
-from utils import oriented_angle
+from utils import normalize_rect_orientation, squared_p2p_dist, p2p_dist, thresh_savoula, show
 
 
 class SudokuNotFoundException(Exception):
 
     def __init__(self, *args: object) -> None:
         super().__init__(*args)
-
-
-def squared_p2p_dist(p1, p2):
-    dx = p1[0] - p2[0]
-    dy = p1[1] - p2[1]
-    return dx * dx + dy * dy
-
-
-def p2p_dist(p1, p2):
-    return math.sqrt(squared_p2p_dist(p1, p2))
 
 
 def in_resize(image, long_side=1024):
@@ -56,15 +45,19 @@ def detect_sudoku(sudoku_img):
     # Must be careful not to over-dilate, otherwise sudoku can merge with surroundings -> bad bbox/contour
     dilation_kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (5, 5))
     dilated = cv.dilate(sudoku_bin, dilation_kernel)
-
     # show(dilated)
 
-    image_center = (int(round(sudoku_img.shape[1] / 2)), int(round(sudoku_img.shape[0] / 2)))
-
     # Finding the largest contour (should be the sudoku)
-    contours, hierarchy = cv.findContours(dilated, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv.findContours(dilated, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
+    points = locate_sudoku_contour(contours, sudoku_img)
+
+    return points
+
+
+def locate_sudoku_contour(contours, sudoku_img):
     max_area = 0
     max_index = -1
+    image_center = (int(round(sudoku_img.shape[1] / 2)), int(round(sudoku_img.shape[0] / 2)))
     for i in range(len(contours)):
         contour = contours[i]
 
@@ -73,15 +66,14 @@ def detect_sudoku(sudoku_img):
         if polytest < 0:
             continue
 
+        # test if the contour is approximately square
         points = cv.boxPoints(cv.minAreaRect(contour))
         a, b, c, d = points
         d1 = squared_p2p_dist(a, b)
         d2 = squared_p2p_dist(a, d)
-
         square_thresh = (d1 + d2) / 2 * 0.5
         square_diff = abs(d1 - d2)
         if square_diff > square_thresh:
-            # print(f'Not square {square_diff} {square_thresh}')
             continue
 
         # test if the contour is large enough
@@ -93,54 +85,21 @@ def detect_sudoku(sudoku_img):
     if max_index < 0:
         raise SudokuNotFoundException('Sudoku not found.')
 
-    points = cv.boxPoints(cv.minAreaRect(contours[max_index]))
-    #     a, b, c, d = points
-    #     d1 = squared_p2p_dist(a, b)
-    #     d2 = squared_p2p_dist(a, d)
-    #     print(d1, ' ', d2, ' ', abs(d1 - d2))
+    max_ct = contours[max_index]
 
-    rect = np.array(points).reshape(4, 2).astype(np.int32)
+    epsilon = 0.1 * cv.arcLength(max_ct, closed=True)
+    points = cv.approxPolyDP(max_ct, epsilon, closed=True)
 
-    rect = normalize_rect_orientation(rect)
+    if points.shape[0] != 4:
+        print('Could not approx. sudoku shape with quad.')
+        points = cv.minAreaRect(max_ct)
+        points = cv.boxPoints(points)
+        points = np.array(points)
 
-    # x, y, w, h = cv.boundingRect(contours[max_index])
+    points = points.reshape(4, 2).astype(np.int32)
+    points = normalize_rect_orientation(points)
 
-    # for i in range(len(contours)):
-    #     color = (rng.randint(0, 256), rng.randint(0, 256), rng.randint(0, 256))
-    #     cv.drawContours(sudoku_img, contours, i, color, 2, cv.LINE_8, hierarchy, 0)
-    # show(sudoku_img, name='contours')
-
-    # img = cv.rectangle(sudoku_img, (x, y), (x + w, y + h), (0, 255, 0), thickness=5)
-    # show(img, name='Bounds')
-
-    return rect
-
-
-def normalize_rect_orientation(rect):
-    assert rect.shape[0] == 4 and rect.shape[1] == 2
-
-    # Ordering the indices by x and y coordinates, then taking the lower 2 values each
-    lower_xy = np.concatenate([np.argsort(rect[:, 0])[:2], np.argsort(rect[:, 1])[:2]], axis=0)
-
-    # Find the value which appears two times, i.e. being in the lower 2 values for x and y direction. There can only be
-    # one, unless the rect is malformed (e.g. all points are the same) or at an angle of exactly 45deg. In the latter
-    # case it is impossible to determine the correct orientation, thus an arbitrary choice is made.
-    values, counts = np.unique(lower_xy, return_counts=True)
-    ind = np.argmax(counts)
-    ul_idx = values[ind]
-
-    # Shift the coordinates to the correct position, such that the upper left corner is the first coordinate
-    rect = np.roll(rect, shift=-ul_idx, axis=0)
-
-    # oriented angle to e1
-    angle = oriented_angle(rect[1, 0] - rect[0, 0], rect[1, 1] - rect[0, 1], 1, 0) / np.pi * 180
-    # if the angle between the first rect side and the x axis is not between -45 and 45 the rectangle points are the
-    # wrong way around. Flipping the coordinate order and shifting by 1 to bring the first coordinate back to pos 0
-    # fixes the problem.
-    if not (-45.0 <= angle <= 45.0):
-        rect = np.roll(rect[::-1, :], shift=1, axis=0)
-
-    return rect
+    return points
 
 
 def unwarp_patch(image, poly_coords, out_size=(1024, 1024), return_grid=False):
@@ -180,25 +139,274 @@ def unwarp_patch(image, poly_coords, out_size=(1024, 1024), return_grid=False):
     return interp_img
 
 
-def pad_contour(image, coords, padding=15):
-    img = np.zeros(image.shape[:2], dtype=np.uint8)
+def pad_contour(coords, padding=15):
 
-    cv.fillPoly(img, [coords], color=(255,))
+    center = coords.mean(axis=0)
 
-    dilation_kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (padding * 2, padding * 2))
-    dilated = cv.dilate(img, dilation_kernel)
+    for i in range(len(coords)):
+        vec = coords[i, :] - center
+        sum_sq = np.sum(vec * vec)
+        num = padding + np.sqrt(sum_sq)
+        c = np.sqrt(num * num / sum_sq)
 
-    contours, hierarchy = cv.findContours(dilated, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
+        coords[i, :] = center + c * vec
 
-    max_area = 0
-    max_index = 0
+    return coords.astype(np.int32)
+
+    # img = np.zeros(image.shape[:2], dtype=np.uint8)
+    # cv.fillPoly(img, [coords], color=(255,))
+    # dilation_kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (padding * 2, padding * 2))
+    # dilated = cv.dilate(img, dilation_kernel)
+    #
+    # contours, hierarchy = cv.findContours(dilated, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
+    #
+    # max_area = 0
+    # max_index = 0
+    # for i in range(len(contours)):
+    #     contour = contours[i]
+    #     contour_area = cv.contourArea(contour, oriented=False)
+    #     if contour_area > max_area:
+    #         max_area = contour_area
+    #         max_index = i
+    #
+    # points = cv.boxPoints(cv.minAreaRect(contours[max_index]))
+    # rect = np.array(points).reshape(4, 2).astype(np.int32)
+    # return normalize_rect_orientation(rect)
+
+
+def extract_cells(image):
+    sudoku = binarize_sudoku(image)
+
+    cells = []
+    contours, hierarchy = cv.findContours(sudoku, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
+    contour_canvas = image.copy()
     for i in range(len(contours)):
-        contour = contours[i]
-        contour_area = cv.contourArea(contour, oriented=False)
-        if contour_area > max_area:
-            max_area = contour_area
-            max_index = i
+        # contours[i] = cv.convexHull(contours[i])
 
-    points = cv.boxPoints(cv.minAreaRect(contours[max_index]))
-    rect = np.array(points).reshape(4, 2).astype(np.int32)
-    return normalize_rect_orientation(rect)
+        box = np.array(cv.boxPoints(cv.minAreaRect(contours[i]))).astype(np.int32)
+        area = cv.contourArea(box)
+        if 80 * 80 <= area <= 120 * 120:
+            center = box.mean(axis=0)
+            cells.append((center, box))
+            color = (0, 255, 0)
+        else:
+            color = (0, 0, 255)
+
+        contours[i] = box.reshape((-1, 1, 2))
+
+        cv.drawContours(contour_canvas, contours, i, color, 2, cv.LINE_8, hierarchy, 0)
+
+    # sudoku_bounds = locate_sudoku_contour(contours, sudoku)
+    # cv.polylines(contour_canvas, [sudoku_bounds], True, (255, 0, 0), thickness=3)
+
+    cell_to_node = compute_cell2node_mapping_fast(cells, contour_canvas)
+
+    pad = 3
+    ps = 64
+    patch_size = (ps + 2 * pad, ps + 2 * pad)
+
+    cell_coords = np.zeros((81, 4, 2))
+    cell_patches = np.zeros((81, ps, ps, 3))
+    for i in range(81):
+        node_idx = cell_to_node.flatten()[i]
+        coordinates = cells[node_idx][1]
+
+        x_ord = np.argsort(coordinates[:, 0])
+        coords = coordinates[x_ord]
+
+        lower = coords[:2, :]
+        order = np.argsort(lower[:, 1])[::-1]
+        lower = lower[order]
+
+        upper = coords[2:, :]
+        order = np.argsort(upper[:, 1])
+        upper = upper[order]
+
+        coordinates[:2, :] = lower
+        coordinates[2:, :] = upper
+
+        coordinates = coordinates[[1, 2, 3, 0]]
+
+        padded_cell_patch = unwarp_patch(image, coordinates, out_size=patch_size)
+
+        cell_coords[i, :, :] = coords
+        cell_patches[i, :, :, :] = padded_cell_patch[pad:pad + ps, pad:pad + ps]
+
+    return cell_patches, cell_coords
+
+
+def compute_cell2node_mapping_fast(cells, contour_canvas):
+    step = 1024 / 9
+    mapping = -np.ones((9, 9), dtype=np.int32)
+    for cell_index, cell in enumerate(cells):
+        cx, cy = cell[0]
+
+        i = int(cx / step)
+        j = int(cy / step)
+
+        if not (0 <= i < 1024) or not (0 <= j < 1024):
+            print(f'Position cannot be mapped. Out of range: ({i},{j})')
+
+        if mapping[j][i] < 0:
+            mapping[j][i] = cell_index
+        else:
+            print(f'Cell at ({i},{j}) already occupied by {mapping[j][i]}')
+
+    for i in range(81):
+        cx, cy = cells[mapping.flatten()[i]][0]
+        center = (int(cx), int(cy))
+        cv.putText(contour_canvas, str(i), center, cv.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), thickness=2)
+        cv.drawMarker(contour_canvas, center, (0, 255, 255))
+
+    show(contour_canvas, 'Cellmapping', True)
+
+    print(mapping)
+
+    return mapping
+
+
+def compute_cell2node_mapping(cells, contour_canvas):
+    # compute the cell graph
+    edges = []
+    for i in range(len(cells)):
+        for j in range(len(cells)):
+            if i == j:
+                continue
+
+            other = cells[j]
+
+            p1 = cells[i][0]
+            p2 = other[0]
+            dist = p2p_dist(p1, p2)
+
+            e1 = np.array([1, 0])
+            diff_norm = (p1 - p2) / dist
+            angle = np.arccos(np.dot(e1, diff_norm))
+
+            dd = math.pi / 8
+
+            mod_pi = angle % math.pi
+            if mod_pi <= dd or math.pi - dd <= mod_pi:
+                direction = 'h'
+            elif math.pi / 2 - dd <= mod_pi <= math.pi / 2 + dd:
+                direction = 'v'
+            else:
+                direction = None
+
+            if direction is not None and 80 <= dist <= 115:
+                edges.append((i, j, dist, angle, direction))
+
+    # visualization
+    for node_num, node in enumerate(cells):
+        center = tuple(node[0].astype(np.int32))
+        cv.drawMarker(contour_canvas, center, (0, 255, 0))
+        cv.putText(contour_canvas, str(node_num), center, cv.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), thickness=2)
+    for edge in edges:
+        direction = edge[4]
+        p1 = tuple(cells[edge[0]][0].astype(np.int32))
+        p2 = tuple(cells[edge[1]][0].astype(np.int32))
+
+        color = (127, 0, 127) if direction == 'h' else (127, 127, 0)
+        cv.line(contour_canvas, p1, p2, color)
+
+    # find the first node
+    first_node = 0
+    changed = True
+    while changed:
+        changed = False
+        for edge in edges:
+            if edge[0] != first_node:
+                continue
+
+            node = cells[first_node]
+            other = cells[edge[1]]
+            orientation = edge[4]
+            if orientation == 'h' and node[0][0] > other[0][0] \
+                    or orientation == 'v' and node[0][1] > other[0][1]:
+                first_node = edge[1]
+                changed = True
+                continue
+
+    cv.drawMarker(contour_canvas, tuple(cells[first_node][0].astype(np.int32)), (0, 255, 255),
+                  markerSize=20, thickness=5)
+
+    edgemap = {i: [edge for edge in filter(lambda e: e[0] == i, edges)] for i in range(len(cells))}
+    cell_to_node = np.zeros((9, 9), dtype=np.int32)
+    row_node = col_node = first_node
+    for i in range(9):
+        for j in range(9):
+            cell_to_node[i, j] = col_node
+
+            for edge in edgemap[col_node]:
+                if edge[4] == 'h' and cells[col_node][0][0] < cells[edge[1]][0][0]:
+                    col_node = edge[1]
+            # TODO: Detect failures here, i.e. when col_nodes didn't change
+
+        for edge in edgemap[row_node]:
+            if edge[4] == 'v' and cells[row_node][0][1] < cells[edge[1]][0][1]:
+                row_node = edge[1]
+                col_node = row_node
+        # TODO: Detect failures here, i.e. when row_node didn't change
+
+    show(contour_canvas, name='Contours', no_wait=True)
+
+    return cell_to_node
+
+
+def binarize_sudoku(image):
+    sudoku = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+    # show(sudoku, name='Gray', no_wait=True)
+
+    # erosion_kernel = cv.getStructuringElement(cv.MORPH_RECT, (5, 5))
+    # sudoku = cv.erode(sudoku, erosion_kernel)
+    # show(sudoku, name='Eroded', no_wait=True)
+
+    # hist, bins = np.histogram(sudoku, bins=np.arange(0, 255))
+    # plt.plot(hist)
+    # plt.axvline(x=255-threshold)
+    # plt.show()
+
+    sudoku = cv.GaussianBlur(sudoku, (5, 5), 0)
+    # show(sudoku, name='Blurred', no_wait=True)
+
+    thresh = 'sav'
+    if thresh == 'adaptive':
+        sudoku = cv.adaptiveThreshold(sudoku, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY_INV, 51, C=2)
+    elif thresh == 'sav':
+        sudoku = thresh_savoula(sudoku, window_size=51)
+    else:
+        kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, ksize=(21, 21))
+        closing = cv.morphologyEx(sudoku, cv.MORPH_CLOSE, kernel)
+        # show(closing, name='Closing', no_wait=True)
+
+        sudoku = (sudoku / closing * 255).astype(np.uint8)
+        # show(sudoku, name='GrayNorm', no_wait=True)
+
+        threshold, _ = cv.threshold(sudoku, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU)
+
+        # blur = cv.GaussianBlur(sudoku, (5, 5), 0)
+        # _, sudoku2 = cv.threshold(blur, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU)
+        # show(sudoku2, name='BinarizedGaussian', no_wait=True)
+
+        # threshold, sudoku = cv.threshold(sudoku, 127, 255, cv.THRESH_BINARY_INV)
+        # sudoku = cv.adaptiveThreshold(sudoku, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY_INV, 701, C=2)
+        # sudoku = adaptiveThresh(sudoku, 50, 180)
+        # threshold, _ = cv.threshold(sudoku, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU)
+        # threshold, sudoku = cv.threshold(sudoku, threshold+20, 255, cv.THRESH_BINARY_INV)
+    # print(f'Otsu`s thresh {threshold}')
+    # show(sudoku, name='Binarized', no_wait=True)
+
+    kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, ksize=(5, 5))
+    sudoku = cv.dilate(sudoku, kernel)
+    # show(sudoku, name='Binarized+dilated', no_wait=True)
+
+    sudoku = cv.medianBlur(sudoku, 7)
+    # show(sudoku, name='Binarized+Median', no_wait=True)
+
+    # dilation_kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (7, 7))
+    # sudoku = cv.dilate(sudoku, dilation_kernel)
+    # show(sudoku, name='Dilated', no_wait=True)
+
+    # cv.waitKey()
+
+    return sudoku
