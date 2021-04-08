@@ -1,16 +1,28 @@
+import os
 import time
 
 import cv2 as cv
 import numpy as np
 
-from classifier import Net
+from classifier import Net, classify_digit
 from detection_utils import in_resize, detect_sudoku, unwarp_patch, pad_contour, SudokuNotFoundException, \
     extract_cells
 from sudoku_solver import solve_sudoku
 from utils import rotation_correction, read_ground_truth, show
 
+
+def save_cell_patch(cell_patch, classification):
+    gray_patch = cv.cvtColor(cell_patch, cv.COLOR_BGR2GRAY)
+    _, pt = cv.threshold(gray_patch, 100, 255, cv.THRESH_BINARY_INV)
+    nnz = np.count_nonzero(pt)
+
+    sudoku_basename = os.path.splitext(os.path.basename(file_path))[0]
+    cell_path = os.path.join('extracted_digits', f'{classification}_{nnz:08d}_{sudoku_basename}_{i}.jpg')
+    cv.imwrite(cell_path, cell_patch)
+
+
 gt_annoatations = read_ground_truth(np.os.path.abspath('ground_truth_new.csv'))
-digit_classifier = Net()
+digit_classifier = Net(size=64)
 digit_classifier.load()
 
 for sudoku_index, (file_path, gt_coords) in enumerate(gt_annoatations):
@@ -61,6 +73,7 @@ for sudoku_index, (file_path, gt_coords) in enumerate(gt_annoatations):
     out = np.zeros((81,), dtype=np.int32)
     for i in range(81):
         cell_patch = cell_images[i, :, :, :]
+
         gray_cell = cv.cvtColor(cell_patch, cv.COLOR_BGR2GRAY)
         # deskewed_cell = deskew(gray_cell)
 
@@ -73,15 +86,11 @@ for sudoku_index, (file_path, gt_coords) in enumerate(gt_annoatations):
         else:
             out[i] = 0
 
-    out = out.reshape((9, 9))
-    # print(out)
+        # save_cell_patch(cell_patch, out[i])
 
-    # _, pt = cv.threshold(gray_cell, 100, 255, cv.THRESH_BINARY_INV)
-    # nnz = np.count_nonzero(pt)
-    #
-    # cell_path = os.path.join('extracted_digits',
-    #                          f'{nnz:08d}_{os.path.splitext(os.path.basename(file_path))[0]}_{i}.jpg')
-    # cv.imwrite(cell_path, cell_patch)
+    is_empty_cell = out == 0
+    out = out.reshape((9, 9))
+    print(out)
 
     solved_sudoku = solve_sudoku(out.tolist())
     solved_sudoku = out if solved_sudoku is None else np.array([int(x) for x in solved_sudoku]).reshape(9, 9)
@@ -93,7 +102,8 @@ for sudoku_index, (file_path, gt_coords) in enumerate(gt_annoatations):
         cell_center = crop_grid[0, cell_center[1].item(), cell_center[0].item(), :].astype(np.int32)
         cell_center = (cell_center[0].item(), cell_center[1].item())
 
-        cv.putText(canvas, str(solved_sudoku[i]), cell_center, cv.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), thickness=2)
+        color = (0, 0, 255) if is_empty_cell[i] else (0, 255, 0)
+        cv.putText(canvas, str(solved_sudoku[i]), cell_center, cv.FONT_HERSHEY_SIMPLEX, 1, color, thickness=2)
         # cv.drawMarker(canvas, cell_center, (0, 255, 0))
 
     cv.polylines(canvas, [pred_location], True, (255, 0, 0), thickness=3)

@@ -182,10 +182,7 @@ def extract_cells(image):
     contours, hierarchy = cv.findContours(sudoku, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
     contour_canvas = image.copy()
     for i in range(len(contours)):
-        # contours[i] = cv.convexHull(contours[i])
-
         box = approx_quad(contours[i])
-        # box = np.array(cv.boxPoints(cv.minAreaRect(contours[i]))).astype(np.int32)
 
         area = cv.contourArea(box)
         if 80 * 80 <= area <= 120 * 120:
@@ -199,46 +196,26 @@ def extract_cells(image):
 
         cv.drawContours(contour_canvas, contours, i, color, 2, cv.LINE_8, hierarchy, 0)
 
-    # sudoku_bounds = locate_sudoku_contour(contours, sudoku)
-    # cv.polylines(contour_canvas, [sudoku_bounds], True, (255, 0, 0), thickness=3)
-
     cell_to_node = compute_cell2node_mapping_fast(cells, contour_canvas)
 
     pad = 3
-    ps = 64
-    patch_size = (ps + 2 * pad, ps + 2 * pad)
+    patch_size = 64
+    padded_size = (patch_size + 2 * pad, patch_size + 2 * pad)
 
     cell_coords = np.zeros((81, 4, 2))
-    cell_patches = np.zeros((81, ps, ps, 3))
+    cell_patches = np.zeros((81, patch_size, patch_size, 3))
     for i in range(81):
         node_idx = cell_to_node.flatten()[i]
         if node_idx < 0:
             cell_coords[i, :, :] = -1
             continue
 
-
         coordinates = cells[node_idx][1]
 
-        x_ord = np.argsort(coordinates[:, 0])
-        coords = coordinates[x_ord]
+        padded_cell_patch = unwarp_patch(image, coordinates, out_size=padded_size)
 
-        lower = coords[:2, :]
-        order = np.argsort(lower[:, 1])[::-1]
-        lower = lower[order]
-
-        upper = coords[2:, :]
-        order = np.argsort(upper[:, 1])
-        upper = upper[order]
-
-        coordinates[:2, :] = lower
-        coordinates[2:, :] = upper
-
-        coordinates = coordinates[[1, 2, 3, 0]]
-
-        padded_cell_patch = unwarp_patch(image, coordinates, out_size=patch_size)
-
-        cell_coords[i, :, :] = coords
-        cell_patches[i, :, :, :] = padded_cell_patch[pad:pad + ps, pad:pad + ps]
+        cell_coords[i, :, :] = coordinates
+        cell_patches[i, :, :, :] = padded_cell_patch[pad:pad + patch_size, pad:pad + patch_size]
 
     return cell_patches, cell_coords
 

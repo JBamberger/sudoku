@@ -1,4 +1,6 @@
 import os
+import random
+
 import cv2 as cv
 import torch
 import torch.nn as nn
@@ -52,13 +54,13 @@ def classify_digit(patch) -> int:
 
 
 def prep_cell(x):
-    x = cv.resize(x, (20,20), interpolation=cv.INTER_AREA)
+    x = cv.resize(x, (20, 20), interpolation=cv.INTER_AREA)
     _, threshed = cv.threshold(x, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU)
     return threshed
 
 
 inference_transform = transforms.Compose([
-    transforms.Lambda(prep_cell),
+    # transforms.Lambda(prep_cell),
     transforms.ToTensor(),
     transforms.Normalize(0.5, 0.5)])
 
@@ -82,13 +84,15 @@ class Net(nn.Module):
     #     x = self.fc3(x)
     #     return x
 
-    def __init__(self, exclude_zero=True):
+    def __init__(self, exclude_zero=True, size=20):
+        flat_dim = ((size - 4) // 2) ** 2 * 64
+
         super(Net, self).__init__()
         self.conv1 = nn.Conv2d(1, 32, 3, 1)
         self.conv2 = nn.Conv2d(32, 64, 3, 1)
         self.dropout1 = nn.Dropout(0.25)
         self.dropout2 = nn.Dropout(0.5)
-        self.fc1 = nn.Linear(4096, 128)
+        self.fc1 = nn.Linear(flat_dim, 128)
         self.fc2 = nn.Linear(128, 9 if exclude_zero else 10)
 
     def forward(self, x):
@@ -122,6 +126,41 @@ class Net(nn.Module):
         result = torch.argmax(result, dim=1)
 
         return result + 1
+
+
+class MyDigitDataset(Dataset):
+    def __init__(self, transform=None, path=None, split_idx=-30):
+        self.transform = transform
+        if path is None:
+            path = 'digit_dataset'
+
+        digits = []
+        labels = []
+        for i in range(1, 10):
+            digit_path = os.path.join(path, str(i))
+            img_names = os.listdir(digit_path)
+            random.shuffle(img_names)
+            if split_idx >= 0:
+                img_names = img_names[:split_idx]
+            else:
+                img_names = img_names[abs(split_idx):]
+
+            for image_name in img_names:
+                img_path = os.path.join(digit_path, image_name)
+                img = cv.imread(img_path, cv.IMREAD_GRAYSCALE)
+                digits.append(img)
+                labels.append(i - 1)
+
+        self.digits = np.array(digits)
+        self.labels = torch.tensor(labels)
+
+    def __getitem__(self, item):
+        if self.transform is not None:
+            return transform(self.digits[item]), self.labels[item]
+        return np.expand_dims(self.digits[item], axis=-1), self.labels[item]
+
+    def __len__(self):
+        return self.labels.numel()
 
 
 class DigitDataset(Dataset):
@@ -185,14 +224,19 @@ transform = transforms.Compose(
 
 
 def train(use_cuda=True):
-    split_idx = 400
-    trainset = DigitDataset(transform=transform, split_idx=split_idx)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=64, shuffle=True, num_workers=2, pin_memory=True)
+    # split_idx = 400
+    # trainset = DigitDataset(transform=transform, split_idx=split_idx)
+    # valset = DigitDataset(transform=transform, split_idx=-split_idx)
 
-    valset = DigitDataset(transform=transform, split_idx=-split_idx)
+    split_idx = 30
+    trainset = MyDigitDataset(transform=transform, split_idx=-split_idx)
+    valset = MyDigitDataset(transform=transform, split_idx=split_idx)
+    print(f'Trainset size: {len(trainset)} Valset size: {len(valset)}.')
+
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=64, shuffle=True, num_workers=2, pin_memory=True)
     valloader = torch.utils.data.DataLoader(valset, batch_size=64, shuffle=False, num_workers=2, pin_memory=True)
 
-    net = Net()
+    net = Net(size=64)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
@@ -206,6 +250,7 @@ def train(use_cuda=True):
     for epoch in range(10):
 
         train_loss = Average()
+        train_accuracy = Average()
         net.train()
         for i, data in enumerate(trainloader):
             inputs, labels = data
@@ -219,13 +264,16 @@ def train(use_cuda=True):
             outputs = net(inputs)
             loss = criterion(outputs, labels)
 
+            accuracy = torch.sum(outputs.argmax(dim=1) == labels).item()
+            train_accuracy.update(accuracy, labels.numel())
             train_loss.update(loss.item(), labels.numel())
             loss.backward()
             optimizer.step()
 
         train_losses.append(train_loss.avg)
 
-        total_loss = Average()
+        val_loss = Average()
+        val_accuracy = Average()
         with torch.no_grad():
             net.eval()
             for i, data in enumerate(valloader):
@@ -235,10 +283,12 @@ def train(use_cuda=True):
                     labels = labels.cuda()
 
                 outputs = net(inputs)
+                accuracy = torch.sum(outputs.argmax(dim=1) == labels).item()
+                val_accuracy.update(accuracy, labels.numel())
                 loss = criterion(outputs, labels)
-                total_loss.update(loss, labels.numel())
-        print(f'Train loss: {train_loss.avg:f} Validation loss: {total_loss.avg:f}')
-        val_losses.append(total_loss.avg)
+                val_loss.update(loss, labels.numel())
+        print(f'{epoch}: Train loss: {train_loss.avg:f} Validation loss: {val_loss.avg:f} Train Accuracy: {train_accuracy.avg:f} Val Accuracy: {val_accuracy.avg:f}')
+        val_losses.append(val_loss.avg)
 
     plt.plot(train_losses, label='Train_losses')
     plt.plot(val_losses, label='Train_losses')
