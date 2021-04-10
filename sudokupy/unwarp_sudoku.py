@@ -4,10 +4,10 @@ import time
 import cv2 as cv
 import numpy as np
 
-from classifier import Net, classify_digit
+from classifier import Net
 from detection_utils import in_resize, detect_sudoku, unwarp_patch, pad_contour, SudokuNotFoundException, \
     extract_cells
-from sudoku_solver import solve_sudoku
+from solver.sudoku_solver import solve_sudoku
 from utils import rotation_correction, read_ground_truth, show
 
 
@@ -93,7 +93,7 @@ for sudoku_index, (file_path, gt_coords) in enumerate(gt_annoatations):
     print(out)
 
     solved_sudoku = solve_sudoku(out.tolist())
-    solved_sudoku = out if solved_sudoku is None else np.array([int(x) for x in solved_sudoku]).reshape(9, 9)
+    solved_sudoku = out if solved_sudoku is None else np.array(solved_sudoku)
     # print(solved_sudoku)
 
     solved_sudoku = solved_sudoku.flatten()
