@@ -3,10 +3,12 @@ import os
 import cv2 as cv
 import numpy as np
 
+import config
 from utils import read_ground_truth
 
-sudoku_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'share', 'only1')
-sudoku_files = [os.path.join(sudoku_dir, fn) for fn in os.listdir(sudoku_dir) if os.path.splitext(fn)[-1] == '.jpg']
+GT_OUT_FILE = config.sudokus_gt_path
+SUDOKU_FILES = [os.path.join(config.sudokus_path, fn)
+                for fn in os.listdir(config.sudokus_path) if os.path.splitext(fn)[-1] == '.jpg']
 
 
 class PolygonSelector:
@@ -161,46 +163,19 @@ def annotate_sudoku_file(file):
 
 
 def annotate_bounding_poly():
-    with open('ground_truth.txt', 'w', encoding='utf8') as f:
-        for i, file in enumerate(sudoku_files):
-            print(f'[{i + 1}/{len(sudoku_files)}] {file}')
+    with open(GT_OUT_FILE, 'w', encoding='utf8') as f:
+        for i, file in enumerate(SUDOKU_FILES):
+            print(f'[{i + 1}/{len(SUDOKU_FILES)}] {file}')
 
             line = annotate_sudoku_file(file)
             print(line, end='')
             f.write(line)
 
 
-def fix_annotations():
-    with open('ground_truth_new.csv', 'w', encoding='utf8') as f:
-        for file_path, coords in read_ground_truth(os.path.abspath('ground_truth.csv')):
-            sudoku_ori = cv.imread(file_path, cv.IMREAD_COLOR)
-
-            large = sudoku_ori.copy()
-            small = scale_down(large)
-
-            scale_x = large.shape[1] / small.shape[1]
-            scale_y = large.shape[0] / small.shape[0]
-
-            polyline = coords.astype(np.float32)
-
-            # reverse scale_up function
-            polyline = polyline / scale_y
-
-            # perform correct scaling
-            polyline[:, 0] *= scale_x
-            polyline[:, 1] *= scale_y
-
-            polyline = polyline.round().astype(np.int32)
-
-            cells = [file_path] + [str(a) for a in polyline.flatten()]
-            line = ', '.join(cells) + '\n'
-            print(line, end='')
-            f.write(line)
-
 
 def rename_sudokus():
-    with open('ground_truth.renamed.txt', 'w', encoding='utf8') as f:
-        for i, (file_path, coords) in enumerate(read_ground_truth(os.path.abspath('ground_truth.txt'))):
+    with open('ground_truth.renamed.csv', 'w', encoding='utf8') as f:
+        for i, (file_path, coords) in enumerate(read_ground_truth(GT_OUT_FILE)):
             i += 31
             new_path = os.path.join(os.path.dirname(file_path), f'sudoku_{i:d}.jpg')
 
@@ -217,5 +192,4 @@ def rename_sudokus():
 
 if __name__ == '__main__':
     annotate_bounding_poly()
-    # fix_annotations()
     # rename_sudokus()

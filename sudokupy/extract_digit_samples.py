@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from torch.nn import functional as F
 
+import config
 from utils import read_ground_truth
 
 
@@ -35,12 +36,7 @@ def create_rect_grid2(image, coords, in_size, out_size):
 
 
 def extract_digit_samples():
-    gt_file = os.path.abspath('ground_truth_new.csv')
-    out_dir = os.path.abspath('extracted_digits')
-    if not os.path.isdir(out_dir):
-        os.mkdir(out_dir)
-
-    for file_path, coords in read_ground_truth(gt_file):
+    for file_path, coords in read_ground_truth(config.sudokus_gt_path):
         sudoku_ori = cv.imread(file_path, cv.IMREAD_COLOR)
 
         sudoku = torch.from_numpy(sudoku_ori).permute((2, 0, 1)).unsqueeze(0).float()

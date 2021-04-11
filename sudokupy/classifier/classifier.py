@@ -11,11 +11,11 @@ from torchvision.transforms import transforms
 import numpy as np
 import matplotlib.pyplot as plt
 
-PATH = 'digit_classifier.pth'
+import config
 
 patches = np.empty((9, 64, 64))
 for i in range(9):
-    patch = cv.imread(f'train_data/{i + 1}.jpg', cv.IMREAD_GRAYSCALE)
+    patch = cv.imread(os.path.join(config.digit_samples_path, f'{i + 1}.jpg'), cv.IMREAD_GRAYSCALE)
     _, threshed = cv.threshold(patch, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU)
     patches[i, :, :] = threshed
 
@@ -110,10 +110,10 @@ class Net(nn.Module):
         output = F.log_softmax(x, dim=1)
         return output
 
-    def load(self, path=PATH):
+    def load(self, path=config.classifier_checkpoint_path):
         self.load_state_dict(torch.load(path))
 
-    def save(self, path=PATH):
+    def save(self, path=config.classifier_checkpoint_path):
         torch.save(self.state_dict(), path)
 
     def classify(self, patches):
@@ -132,7 +132,7 @@ class MyDigitDataset(Dataset):
     def __init__(self, transform=None, path=None, split_idx=-30):
         self.transform = transform
         if path is None:
-            path = '../digit_dataset'
+            path = config.digit_dataset_path
 
         digits = []
         labels = []
@@ -169,8 +169,7 @@ class DigitDataset(Dataset):
         self.transform = transform
 
         # 2000x1000
-        digits_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'share', 'digits.png')
-        digits = cv.imread(digits_path, cv.IMREAD_GRAYSCALE)
+        digits = cv.imread(config.digit5k_dataset_path, cv.IMREAD_GRAYSCALE)
 
         # shape [1000, 2000]
         # digits = torch.from_numpy(digits)
@@ -287,7 +286,8 @@ def train(use_cuda=True):
                 val_accuracy.update(accuracy, labels.numel())
                 loss = criterion(outputs, labels)
                 val_loss.update(loss, labels.numel())
-        print(f'{epoch}: Train loss: {train_loss.avg:f} Validation loss: {val_loss.avg:f} Train Accuracy: {train_accuracy.avg:f} Val Accuracy: {val_accuracy.avg:f}')
+        print(
+            f'{epoch}: Train loss: {train_loss.avg:f} Validation loss: {val_loss.avg:f} Train Accuracy: {train_accuracy.avg:f} Val Accuracy: {val_accuracy.avg:f}')
         val_losses.append(val_loss.avg)
 
     plt.plot(train_losses, label='Train_losses')

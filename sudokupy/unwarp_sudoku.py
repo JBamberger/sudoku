@@ -4,6 +4,7 @@ import time
 import cv2 as cv
 import numpy as np
 
+import config
 from classifier.classifier import Net
 from detection_utils import in_resize, detect_sudoku, unwarp_patch, pad_contour, SudokuNotFoundException, \
     extract_cells
@@ -16,12 +17,12 @@ def save_cell_patch(cell_patch, classification):
     _, pt = cv.threshold(gray_patch, 100, 255, cv.THRESH_BINARY_INV)
     nnz = np.count_nonzero(pt)
 
-    sudoku_basename = os.path.splitext(os.path.basename(file_path))[0]
-    cell_path = os.path.join('extracted_digits', f'{classification}_{nnz:08d}_{sudoku_basename}_{i}.jpg')
+    sudoku_basename = os.path.splitext(os.path.basename(file_path))[0]  # TODO: fix file_path scoping
+    cell_path = os.path.join(config.extracted_digits_path, f'{classification}_{nnz:08d}_{sudoku_basename}_{i}.jpg')
     cv.imwrite(cell_path, cell_patch)
 
 
-gt_annoatations = read_ground_truth(np.os.path.abspath('ground_truth_new.csv'))
+gt_annoatations = read_ground_truth(config.sudokus_gt_path)
 digit_classifier = Net(size=64)
 digit_classifier.load()
 

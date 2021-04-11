@@ -3,12 +3,13 @@ import os
 import cv2 as cv
 import numpy as np
 
+import config
 from legacy.sudoku_detector import SudokuDetector
 from utils import read_ground_truth
 
 
 def eval_detector():
-    annotations = read_ground_truth(os.path.abspath('ground_truth_new.csv'))
+    annotations = read_ground_truth(config.sudokus_gt_path)
     detector = SudokuDetector()
 
     for file_path, coords in annotations:

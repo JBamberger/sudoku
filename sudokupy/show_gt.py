@@ -1,11 +1,10 @@
-import os
-
 import cv2 as cv
 
+import config
 from utils import rotation_correction, read_ground_truth
 
 if __name__ == '__main__':
-    for file_name, coords in read_ground_truth(os.path.abspath('ground_truth_new.csv')):
+    for file_name, coords in read_ground_truth(config.sudokus_gt_path):
         img = cv.imread(file_name, cv.IMREAD_COLOR)
 
         img, coords = rotation_correction(img, coords)
