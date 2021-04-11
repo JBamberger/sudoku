@@ -4,7 +4,7 @@ from typing import List, Set, Optional
 from solver.sudoku import Sudoku
 
 
-def _solve(game, depth=0) -> Optional[List[List[int]]]:
+def _solve(game: Sudoku, depth=0) -> Optional[List[List[int]]]:
     while True:
         edited = False
 
