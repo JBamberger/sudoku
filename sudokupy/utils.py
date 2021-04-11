@@ -1,4 +1,5 @@
 import math
+import os
 from typing import Tuple
 
 import cv2 as cv
@@ -6,6 +7,8 @@ import numpy as np
 import torch
 from skimage.filters import threshold_sauvola
 from torch.nn import functional as F
+
+import config
 
 
 def read_ground_truth(gt_file):
@@ -162,3 +165,14 @@ def show(img, name='Image', no_wait=False):
     cv.imshow(name, cv.resize(img, (1024, int(img.shape[0] / (img.shape[1] / 1024))), interpolation=cv.INTER_AREA))
     if not no_wait:
         cv.waitKey()
+
+
+def save_cell_patch(file_path, cell_num, cell_patch, classification):
+    gray_patch = cv.cvtColor(cell_patch, cv.COLOR_BGR2GRAY)
+    _, pt = cv.threshold(gray_patch, 100, 255, cv.THRESH_BINARY_INV)
+    nnz = np.count_nonzero(pt)
+
+    sudoku_basename = os.path.splitext(os.path.basename(file_path))[0]
+    cell_path = os.path.join(config.extracted_digits_path,
+                             f'{classification}_{nnz:08d}_{sudoku_basename}_{cell_num}.jpg')
+    cv.imwrite(cell_path, cell_patch)

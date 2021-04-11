@@ -1,30 +1,22 @@
-import os
 import time
 
 import cv2 as cv
 import numpy as np
 
 import config
-from classifier.classifier import Net
-from detection_utils import in_resize, detect_sudoku, unwarp_patch, pad_contour, SudokuNotFoundException, \
-    extract_cells
-from solver.sudoku_solver import solve_sudoku
+from sudoku_detector import SudokuDetector
 from utils import rotation_correction, read_ground_truth, show
 
+RED = (0, 0, 255)
+GREEN = (0, 255, 0)
+BLUE = (255, 0, 0)
 
-def save_cell_patch(cell_patch, classification):
-    gray_patch = cv.cvtColor(cell_patch, cv.COLOR_BGR2GRAY)
-    _, pt = cv.threshold(gray_patch, 100, 255, cv.THRESH_BINARY_INV)
-    nnz = np.count_nonzero(pt)
-
-    sudoku_basename = os.path.splitext(os.path.basename(file_path))[0]  # TODO: fix file_path scoping
-    cell_path = os.path.join(config.extracted_digits_path, f'{classification}_{nnz:08d}_{sudoku_basename}_{i}.jpg')
-    cv.imwrite(cell_path, cell_patch)
-
+CYAN = (255, 255, 0)
+MAGENTA = (255, 0, 255)
 
 gt_annoatations = read_ground_truth(config.sudokus_gt_path)
-digit_classifier = Net(size=64)
-digit_classifier.load()
+
+detector = SudokuDetector()
 
 for sudoku_index, (file_path, gt_coords) in enumerate(gt_annoatations):
     if sudoku_index < 0:
@@ -36,87 +28,50 @@ for sudoku_index, (file_path, gt_coords) in enumerate(gt_annoatations):
     # Ensure that the sudoku is always rotated by at most 45 deg in either direction.
     sudoku_img_org, gt_coords = rotation_correction(sudoku_img_org, gt_coords)
 
-    # Scaling such that the longer side is 1024 px long
-    input_downscale, sudoku_img = in_resize(sudoku_img_org)
-    image_center = (int(round(sudoku_img.shape[1] / 2)), int(round(sudoku_img.shape[0] / 2)))
+    det = detector.detect(sudoku_img_org)
 
     # Visualization canvas
-    canvas = sudoku_img.copy()
+    canvas = det.norm_scale_sudoku.copy()
+    image_center = (int(round(canvas.shape[1] / 2)), int(round(canvas.shape[0] / 2)))
 
     # Draw gt rect
     gt_coords = np.array(gt_coords).reshape(4, 2)
-    gt_coords = (gt_coords * input_downscale).astype(np.int32)
-    cv.polylines(canvas, [gt_coords], True, (0, 255, 0), thickness=3)
+    gt_coords = (gt_coords * det.norm_scale_factor).astype(np.int32)
+    cv.polylines(canvas, [gt_coords], True, GREEN, thickness=3)
 
     # draw image center
-    cv.drawMarker(canvas, image_center, (0, 0, 255))
+    cv.drawMarker(canvas, image_center, RED)
 
-    try:
-        pred_location = detect_sudoku(sudoku_img)
-    except SudokuNotFoundException as e:
-        print(f'Failed to detect sudoku. {e}')
+    if det.pred_location is None:
+        print(f'Failed to detect sudoku.')
 
-        cv.putText(canvas, 'Detection failed!', image_center, cv.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), thickness=3)
-        show(canvas, name='Bounds')
-        continue
+        cv.putText(canvas, 'Detection failed!', image_center, cv.FONT_HERSHEY_SIMPLEX, 2, RED, thickness=3)
+    else:
+        bounds = det.pred_location
 
-    # add padding to compensate for bounding boxes that fit too tight
-    padded_location = pad_contour(pred_location, padding=0)
+        solved_sudoku = det.cell_values if det.solved_sudoku is None else det.solved_sudoku
 
-    # unwarp from original image for best warp quality
-    scaled_locations = padded_location / input_downscale
-    sudoku_coarse_unwarp, crop_grid = unwarp_patch(sudoku_img_org, scaled_locations, return_grid=True)
-    crop_grid *= input_downscale
+        # Cell values
+        solved_sudoku = solved_sudoku.flatten()
+        for i in range(81):
+            cell_center = det.cell_coords[i, :, :].mean(0).astype(np.int32)
+            cell_center = det.unwarp_grid[0, cell_center[1].item(), cell_center[0].item(), :].astype(np.int32)
+            cell_center = (cell_center[0].item(), cell_center[1].item())
 
-    cell_images, cell_coords = extract_cells(sudoku_coarse_unwarp)
-    cell_images = cell_images.astype(np.uint8)
+            color = GREEN if det.occupied_cells[i] else RED
+            cv.putText(canvas, str(solved_sudoku[i]), cell_center, cv.FONT_HERSHEY_SIMPLEX, 1, color, thickness=2)
 
-    out = np.zeros((81,), dtype=np.int32)
-    for i in range(81):
-        cell_patch = cell_images[i, :, :, :]
+        # Sudoku detection bounds
+        cv.polylines(canvas, [bounds], True, BLUE, thickness=3)
+        cv.line(canvas, tuple(bounds[0, :]), tuple(bounds[1, :]), MAGENTA, thickness=10)
+        cv.line(canvas, tuple(bounds[1, :]), tuple(bounds[2, :]), CYAN, thickness=10)
 
-        gray_cell = cv.cvtColor(cell_patch, cv.COLOR_BGR2GRAY)
-        # deskewed_cell = deskew(gray_cell)
-
-        pad = 6
-        _, pt = cv.threshold(gray_cell[pad:-pad, pad:-pad], 100, 255, cv.THRESH_BINARY_INV)
-        # print(f'{np.count_nonzero(pt): 4d} {np.var(gray_cell): 5.02f}')
-        if np.count_nonzero(pt) > 100 and np.var(gray_cell) > 500:
-            # out[i] = classify_digit(gray_cell)
-            out[i] = digit_classifier.classify(gray_cell)
-        else:
-            out[i] = 0
-
-        # save_cell_patch(cell_patch, out[i])
-
-    is_empty_cell = out == 0
-    out = out.reshape((9, 9))
-    print(out)
-
-    solved_sudoku = solve_sudoku(out.tolist())
-    solved_sudoku = out if solved_sudoku is None else np.array(solved_sudoku)
-    # print(solved_sudoku)
-
-    solved_sudoku = solved_sudoku.flatten()
-    for i in range(81):
-        cell_center = cell_coords[i, :, :].mean(0).astype(np.int32)
-        cell_center = crop_grid[0, cell_center[1].item(), cell_center[0].item(), :].astype(np.int32)
-        cell_center = (cell_center[0].item(), cell_center[1].item())
-
-        color = (0, 0, 255) if is_empty_cell[i] else (0, 255, 0)
-        cv.putText(canvas, str(solved_sudoku[i]), cell_center, cv.FONT_HERSHEY_SIMPLEX, 1, color, thickness=2)
-        # cv.drawMarker(canvas, cell_center, (0, 255, 0))
-
-    cv.polylines(canvas, [pred_location], True, (255, 0, 0), thickness=3)
-    cv.line(canvas, tuple(pred_location[0, :]), tuple(pred_location[1, :]), (255, 0, 255), thickness=10)
-    cv.line(canvas, tuple(pred_location[1, :]), tuple(pred_location[2, :]), (255, 255, 0), thickness=10)
-
-    for i in range(4):
-        cv.putText(canvas, 'ABCD'[i], tuple(pred_location[i, :]),
-                   cv.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness=2)
+        # Sudoku corner labels
+        for i in range(4):
+            cv.putText(canvas, 'ABCD'[i], tuple(bounds[i, :]), cv.FONT_HERSHEY_SIMPLEX, 1, RED, thickness=2)
 
     print('Took ', time.time() - start)
-    show(canvas, name='Bounds')
+    show(canvas, name='Sudoku')
 
 # sudoku_brightness_normalized
 
