@@ -178,25 +178,33 @@ def pad_contour(coords, padding=15):
 def extract_cells(image):
     sudoku = binarize_sudoku(image)
 
-    cells = []
-    contours, hierarchy = cv.findContours(sudoku, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
     contour_canvas = image.copy()
-    for i in range(len(contours)):
-        box = approx_quad(contours[i])
 
+    contours, hierarchy = cv.findContours(sudoku, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
+
+    def has_cell_size(box):
         area = cv.contourArea(box)
-        if 80 * 80 <= area <= 120 * 120:
-            center = box.mean(axis=0)
-            cells.append((center, box))
-            color = (0, 255, 0)
-        else:
-            color = (0, 0, 255)
+        return 80 * 80 <= area <= 120 * 120
 
-        contours[i] = box.reshape((-1, 1, 2))
+    boxes = list(map(approx_quad, contours))
+    cells = [(box.mean(axis=0), box) for box in filter(lambda box: has_cell_size(box), boxes)]
 
-        cv.drawContours(contour_canvas, contours, i, color, 2, cv.LINE_8, hierarchy, 0)
+    cell_to_node = compute_cell2node_mapping_fast(cells)
 
-    cell_to_node = compute_cell2node_mapping_fast(cells, contour_canvas)
+    # for box in boxes:
+    #     color = (0, 255, 0) if has_cell_size(box) else (0, 0, 255)
+    #     cv.polylines(contour_canvas, [box], isClosed=True, color=color, thickness=2)
+    #
+    # for i in range(81):
+    #     cell_idx = cell_to_node.flatten()[i]
+    #     if cell_idx < 0:
+    #         continue
+    #     cx, cy = cells[cell_idx][0]
+    #     center = (int(cx), int(cy))
+    #     cv.putText(contour_canvas, str(i), center, cv.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), thickness=2)
+    #     cv.drawMarker(contour_canvas, center, (0, 255, 255))
+    #
+    # show(contour_canvas, 'Cellmapping', True)
 
     pad = 3
     patch_size = 64
@@ -220,7 +228,7 @@ def extract_cells(image):
     return cell_patches, cell_coords
 
 
-def compute_cell2node_mapping_fast(cells, contour_canvas):
+def compute_cell2node_mapping_fast(cells):
     step = 1024 / 9
     mapping = -np.ones((9, 9), dtype=np.int32)
     for cell_index, cell in enumerate(cells):
@@ -236,19 +244,6 @@ def compute_cell2node_mapping_fast(cells, contour_canvas):
             mapping[j][i] = cell_index
         else:
             print(f'Cell at ({i},{j}) already occupied by {mapping[j][i]}')
-
-    for i in range(81):
-        cell_idx = mapping.flatten()[i]
-        if cell_idx < 0:
-            continue
-        cx, cy = cells[cell_idx][0]
-        center = (int(cx), int(cy))
-        cv.putText(contour_canvas, str(i), center, cv.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), thickness=2)
-        cv.drawMarker(contour_canvas, center, (0, 255, 255))
-
-    show(contour_canvas, 'Cellmapping', True)
-
-    print(mapping)
 
     return mapping
 
