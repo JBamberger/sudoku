@@ -4,7 +4,7 @@ import time
 import cv2 as cv
 import numpy as np
 
-from classifier import Net
+from classifier.classifier import Net
 from detection_utils import in_resize, detect_sudoku, unwarp_patch, pad_contour, SudokuNotFoundException, \
     extract_cells
 from solver.sudoku_solver import solve_sudoku

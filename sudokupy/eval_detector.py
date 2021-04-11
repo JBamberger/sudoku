@@ -3,7 +3,7 @@ import os
 import cv2 as cv
 import numpy as np
 
-from sudoku_detector import SudokuDetector
+from legacy.sudoku_detector import SudokuDetector
 from utils import read_ground_truth
 
 

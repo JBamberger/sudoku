@@ -11,7 +11,7 @@ from torchvision.transforms import transforms
 import numpy as np
 import matplotlib.pyplot as plt
 
-PATH = './digit_classifier.pth'
+PATH = 'digit_classifier.pth'
 
 patches = np.empty((9, 64, 64))
 for i in range(9):
@@ -132,7 +132,7 @@ class MyDigitDataset(Dataset):
     def __init__(self, transform=None, path=None, split_idx=-30):
         self.transform = transform
         if path is None:
-            path = 'digit_dataset'
+            path = '../digit_dataset'
 
         digits = []
         labels = []
