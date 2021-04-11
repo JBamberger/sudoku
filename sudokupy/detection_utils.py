@@ -7,6 +7,7 @@ import torch
 from torch.nn import functional as F
 
 from utils import normalize_rect_orientation, squared_p2p_dist, p2p_dist, thresh_savoula, show
+from scipy.spatial import distance
 
 
 def in_resize(image, long_side=1024):
@@ -95,11 +96,38 @@ def approx_quad(points, normalize_orientation=True):
     :param normalize_orientation: True to normalize the orientation, i.e. first point is upper left, CW order.
     :return: quad corner points of shape [4, 2]
     """
-    epsilon = 0.1 * cv.arcLength(points, closed=True)
-    points = cv.approxPolyDP(points, epsilon, closed=True)
 
-    if points.shape[0] != 4:
-        print('Could not approx. sudoku shape with quad.')
+    # epsilon = 0.1 * cv.arcLength(points, closed=True)
+    # points = cv.approxPolyDP(points, epsilon, closed=True)
+
+    if points.ndim == 3:
+        assert points.shape[1] == 1
+        points = points.reshape(-1, 2)
+
+    n = points.shape[0]
+
+    # compute all pairwise distances between the points.
+    distances = distance.cdist(points, points)
+
+    # Points farthest apart in the contour
+    pos = distances.argmax()
+    p1 = pos // n
+    p2 = pos % n
+
+    # Point farthest from p1 and p2
+    dist_sum = distances[p1, :] + distances[p2, :]
+    p3 = np.argmax(dist_sum)
+
+    # Point farthest from p1, p2 and p3
+    p4 = np.argmax(dist_sum + distances[p3, :])
+
+    # Sort point indices to retain contour shape and build new point list
+    new_points = np.array([points[i] for i in sorted({p1, p2, p3, p4})])
+
+    if new_points.shape[0] == 4:
+        points = new_points
+    else:
+        print('Could not approximate contour shape with quad.')
         points = cv.minAreaRect(points)
         points = cv.boxPoints(points)
         points = np.array(points)
