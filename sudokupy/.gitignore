@@ -1,4 +1,4 @@
 /venv/
 *.pt
 *.pth
-extracted_digits/
+../data/extracted_digits/
