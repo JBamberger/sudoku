@@ -1,4 +1,5 @@
 import math
+from typing import Optional
 
 import numpy as np
 import cv2 as cv
@@ -6,12 +7,6 @@ import torch
 from torch.nn import functional as F
 
 from utils import normalize_rect_orientation, squared_p2p_dist, p2p_dist, thresh_savoula, show
-
-
-class SudokuNotFoundException(Exception):
-
-    def __init__(self, *args: object) -> None:
-        super().__init__(*args)
 
 
 def in_resize(image, long_side=1024):
@@ -23,7 +18,7 @@ def in_resize(image, long_side=1024):
     return scale, cv.resize(image, None, fx=scale, fy=scale)
 
 
-def detect_sudoku(sudoku_img):
+def detect_sudoku(sudoku_img) -> Optional[np.ndarray]:
     # conversion to gray
     sudoku_gray = cv.cvtColor(sudoku_img, cv.COLOR_BGR2GRAY)
 
@@ -54,7 +49,7 @@ def detect_sudoku(sudoku_img):
     return points
 
 
-def locate_sudoku_contour(contours, sudoku_img):
+def locate_sudoku_contour(contours, sudoku_img) -> Optional[np.ndarray]:
     max_area = 0
     max_index = -1
     image_center = (int(round(sudoku_img.shape[1] / 2)), int(round(sudoku_img.shape[0] / 2)))
@@ -83,7 +78,7 @@ def locate_sudoku_contour(contours, sudoku_img):
             max_index = i
 
     if max_index < 0:
-        raise SudokuNotFoundException('Sudoku not found.')
+        return None
 
     max_ct = contours[max_index]
 
@@ -211,7 +206,7 @@ def extract_cells(image):
     padded_size = (patch_size + 2 * pad, patch_size + 2 * pad)
 
     cell_coords = np.zeros((81, 4, 2))
-    cell_patches = np.zeros((81, patch_size, patch_size, 3))
+    cell_patches = np.zeros((81, patch_size, patch_size, 3), dtype=np.uint8)
     for i in range(81):
         node_idx = cell_to_node.flatten()[i]
         if node_idx < 0:
