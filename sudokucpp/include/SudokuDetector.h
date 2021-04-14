@@ -1,66 +1,26 @@
-#pragma once
+//
+// Created by jannik on 13.04.2021.
+//
 
+#ifndef SUDOKUDETECTOR_H
+#define SUDOKUDETECTOR_H
 #include <memory>
-#include <opencv2/core/core.hpp>
-#include <utility>
-#include <vector>
+#include <opencv2/core.hpp>
 
-struct Quad
-{
-    cv::Point2f tl;
-    cv::Point2f tr;
-    cv::Point2f br;
-    cv::Point2f bl;
-
-    [[nodiscard]] inline std::vector<cv::Point2f> asVec() const
-    {
-        std::vector<cv::Point2f> out;
-        out.push_back(tl);
-        out.push_back(tr);
-        out.push_back(br);
-        out.push_back(bl);
-        return out;
-    }
-};
-
-struct Sudoku
-{
-    // input image
-    const cv::Mat input;
-
-    // aligned (square) version of the sudoku
-    cv::Mat aligned;
-
-    // bounding box of the first detection
-    cv::Rect bbox;
-
-    // corner points in the original image
-    Quad corners;
-
-    // sudoku cells in row-major order
-    std::vector<cv::Rect2i> cells;
-
-    // sudoku cell contents
-    std::vector<cv::Mat> cell_contents;
-
-    // mapping from unwarped to warped
-    cv::Mat warpMap;
-
-    // mapping from warped to unwarped
-    cv::Mat unwarpMap;
-
-    explicit Sudoku(cv::Mat input)
-      : input(std::move(input))
-    {}
-};
+class SudokuDetection
+{};
 
 class SudokuDetector
 {
-    class Impl;
-    std::unique_ptr<Impl> pimpl;
 
-  public:
-    explicit SudokuDetector();
-    ~SudokuDetector();
-    Sudoku detect_sudoku(const cv::Mat& input);
+    std::tuple<cv::Mat, double> inputResize(cv::Mat sudokuImage, size_t long_side=1024);
+    cv::Mat detectSudoku(cv::Mat normSudoku);
+    void padContours(cv::Mat contour, int padding);
+    void unwarpPatch(cv::Mat image, cv::Mat corners, bool return_grid = true);
+    void extractCells(cv::Mat image);
+    void classify(cv::Mat cellPatch);
+
+      public : std::unique_ptr<SudokuDetection> detect(cv::Mat sudokuImage);
 };
+
+#endif // SUDOKUDETECTOR_H
