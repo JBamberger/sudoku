@@ -2,21 +2,39 @@
 #include <iostream>
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
-#include <torch/torch.h>
+//#include <torch/torch.h>
+#include "config.h"
+#include "utils.h"
+#include <filesystem>
+
+namespace fs = std::filesystem;
+
+void
+processSudoku(fs::path path, Quad gt_bbox)
+{
+    cv::Mat sudokuImg = cv::imread(path.string(), cv::IMREAD_COLOR);
+    auto detector = SudokuDetector();
+    auto detection = detector.detect(sudokuImg);
+    auto canvas = sudokuImg.clone();
+
+//    cv::imshow("Output", canvas);
+//    cv::waitKey();
+
+}
 
 int
 main()
 {
-    //    auto detector = SudokuDetector();
-    //
-    //    cv::Mat sudokuImg = cv::imread(R"(../share/sudoku-sk.jpg)", cv::IMREAD_COLOR);
-    //
-    //    auto detection = detector.detect(sudokuImg);
-    //
-    //    auto canvas = sudokuImg.clone();
-    //
+    auto gt = readGroundTruth(sudokusGtPath);
 
-    std::cout << "Hello World" << std::endl << "OpenCV Version: " << cv::getVersionString() << std::endl;
-    std::cout << "Torch Version: " << TORCH_VERSION_MAJOR << "." << TORCH_VERSION_MINOR << "." << TORCH_VERSION_PATCH
-              << std::endl;
+    std::cout << "OpenCV Version: " << cv::getVersionString() << std::endl;
+    //    std::cout << "Torch Version: " << TORCH_VERSION_MAJOR << "." << TORCH_VERSION_MINOR << "." <<
+    //    TORCH_VERSION_PATCH
+    //              << std::endl;
+
+    std::cout << "Found " << gt.size() << " ground truth entries" << std::endl;
+
+    for (const auto& item : gt) {
+        processSudoku(item.first, item.second);
+    }
 }
