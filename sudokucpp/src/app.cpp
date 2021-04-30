@@ -15,10 +15,7 @@ processSudoku(fs::path path, Quad gt_bbox)
     cv::Mat sudokuImg = cv::imread(path.string(), cv::IMREAD_COLOR);
     auto detector = SudokuDetector();
     auto detection = detector.detect(sudokuImg);
-    auto canvas = sudokuImg.clone();
 
-//    cv::imshow("Output", canvas);
-//    cv::waitKey();
 
 }
 

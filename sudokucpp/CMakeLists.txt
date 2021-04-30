@@ -8,7 +8,7 @@ project(sudoku)
 set(CMAKE_CXX_STANDARD 17)
 
 #find_package(Torch REQUIRED)
-find_package(OpenCV 4 REQUIRED core imgcodecs imgproc highgui videoio)
+find_package(OpenCV 4 REQUIRED core imgcodecs imgproc highgui videoio ximgproc)
 
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
