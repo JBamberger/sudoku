@@ -23,10 +23,15 @@ def detect_sudoku(sudoku_img) -> Optional[np.ndarray]:
     # conversion to gray
     sudoku_gray = cv.cvtColor(sudoku_img, cv.COLOR_BGR2GRAY)
 
+    # cv.imshow("mat", sudoku_gray)
+
     # Lightness normalization with morphological closing operation (basically subtracts background color)
     kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, ksize=(25, 25))
     closing = cv.morphologyEx(sudoku_gray, cv.MORPH_CLOSE, kernel)
     sudoku_gray = (sudoku_gray / closing * 255).astype(np.uint8)
+
+    # cv.imshow("closing", closing)
+    # cv.waitKey()
 
     # sudoku_bin = cv.GaussianBlur(sudoku_gray, (5, 5), 0)
     # sudoku_bin = cv.adaptiveThreshold(
@@ -201,8 +206,6 @@ def pad_contour(coords, padding=15):
 def extract_cells(image):
     sudoku = binarize_sudoku(image)
 
-    contour_canvas = image.copy()
-
     contours, hierarchy = cv.findContours(sudoku, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE)
 
     def has_cell_size(box):
@@ -214,6 +217,7 @@ def extract_cells(image):
 
     cell_to_node = compute_cell2node_mapping_fast(cells)
 
+    # contour_canvas = image.copy()
     # for box in boxes:
     #     color = (0, 255, 0) if has_cell_size(box) else (0, 0, 255)
     #     cv.polylines(contour_canvas, [box], isClosed=True, color=color, thickness=2)

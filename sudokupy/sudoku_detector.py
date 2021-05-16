@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import cv2 as cv
 import numpy as np
 
+import config
 from classifier.classifier import Net
 from detection_utils import in_resize, detect_sudoku, unwarp_patch, pad_contour, extract_cells
 from solver.sudoku_solver import solve_sudoku

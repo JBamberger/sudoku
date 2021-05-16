@@ -15,3 +15,5 @@ sudokus_path = os.path.join(data_path, 'sudokus')
 sudokus_gt_path = os.path.join(sudokus_path, 'ground_truth_new.csv')
 
 classifier_checkpoint_path = os.path.join(share_path, 'digit_classifier.pth')
+classifier_torchscript_path = os.path.join(share_path, 'digit_classifier_ts.pth')
+classifier_onnx_path = os.path.join(share_path, 'digit_classifier_ts.onnx')
