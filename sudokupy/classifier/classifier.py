@@ -68,8 +68,8 @@ inference_transform = transforms.Compose([
 
 
 class Net(nn.Module):
-    def __init__(self, exclude_zero=True, size=20):
-        flat_dim = ((size - 4) // 2) ** 2 * 64
+    def __init__(self, input_size=64, num_classes=10):
+        flat_dim = ((input_size - 4) // 2) ** 2 * 64
 
         super(Net, self).__init__()
         self.conv1 = nn.Conv2d(1, 32, 3, 1)
@@ -77,7 +77,7 @@ class Net(nn.Module):
         self.dropout1 = nn.Dropout(0.25)
         self.dropout2 = nn.Dropout(0.5)
         self.fc1 = nn.Linear(flat_dim, 128)
-        self.fc2 = nn.Linear(128, 9 if exclude_zero else 10)
+        self.fc2 = nn.Linear(128, num_classes)
 
     def forward(self, x):
         x = self.conv1(x)
@@ -109,7 +109,7 @@ class Net(nn.Module):
 
         result = torch.argmax(result, dim=1)
 
-        return result + 1
+        return result
 
 
 class MyDigitDataset(Dataset):
@@ -118,10 +118,12 @@ class MyDigitDataset(Dataset):
         if path is None:
             path = config.digit_dataset_path
 
+        self.classes = ['empty'] + [str(i) for i in range(1, 10)]
+
         digits = []
         labels = []
-        for i in range(1, 10):
-            digit_path = os.path.join(path, str(i))
+        for i, cls in enumerate(self.classes):
+            digit_path = os.path.join(path, cls)
             img_names = os.listdir(digit_path)
             random.shuffle(img_names)
             if split_idx >= 0:
@@ -133,7 +135,7 @@ class MyDigitDataset(Dataset):
                 img_path = os.path.join(digit_path, image_name)
                 img = cv.imread(img_path, cv.IMREAD_GRAYSCALE)
                 digits.append(img)
-                labels.append(i - 1)
+                labels.append(i)
 
         self.digits = np.array(digits)
         self.labels = torch.tensor(labels)
@@ -219,7 +221,7 @@ def train(output_file=None, use_cuda=True):
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=64, shuffle=True, num_workers=2, pin_memory=True)
     valloader = torch.utils.data.DataLoader(valset, batch_size=64, shuffle=False, num_workers=2, pin_memory=True)
 
-    net = Net(size=64)
+    net = Net(input_size=64)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
@@ -269,13 +271,13 @@ def train(output_file=None, use_cuda=True):
                 accuracy = torch.sum(outputs.argmax(dim=1) == labels).item()
                 val_accuracy.update(accuracy, labels.numel())
                 loss = criterion(outputs, labels)
-                val_loss.update(loss, labels.numel())
+                val_loss.update(loss.item(), labels.numel())
         print(
             f'{epoch}: Train loss: {train_loss.avg:f} Validation loss: {val_loss.avg:f} Train Accuracy: {train_accuracy.avg:f} Val Accuracy: {val_accuracy.avg:f}')
         val_losses.append(val_loss.avg)
 
     plt.plot(train_losses, label='Train_losses')
-    plt.plot(val_losses, label='Train_losses')
+    plt.plot(val_losses, label='Val_losses')
     plt.legend()
     plt.show()
 
@@ -286,7 +288,7 @@ def export_model(format: str, input_file: Optional[str], output_file: Optional[s
     if input_file is None:
         input_file = config.classifier_checkpoint_path
 
-    net = Net(size=64)
+    net = Net(input_size=64)
     net.load(path=input_file)
     net.eval()
 

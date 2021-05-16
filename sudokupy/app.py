@@ -71,7 +71,10 @@ for sudoku_index, (file_path, gt_coords) in enumerate(gt_annoatations):
             cv.putText(canvas, 'ABCD'[i], tuple(bounds[i, :]), cv.FONT_HERSHEY_SIMPLEX, 1, RED, thickness=2)
 
     print('Took ', time.time() - start)
-    show(canvas, name='Sudoku')
+    show(canvas, name='Sudoku', no_wait=True)
+    key = cv.waitKey()
+    if key == ord('q'):
+        exit()
 
 # sudoku_brightness_normalized
 

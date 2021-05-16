@@ -29,7 +29,7 @@ class SudokuDetection:
 
 class SudokuDetector:
     def __init__(self):
-        self.classifier = Net(size=64)
+        self.classifier = Net(input_size=64)
         self.classifier.load()
 
     def detect(self, frame: np.ndarray) -> SudokuDetection:
@@ -64,10 +64,11 @@ class SudokuDetector:
 
             gray_cell = cv.cvtColor(cell_patch, cv.COLOR_BGR2GRAY)
 
-            pad = 6
-            _, pt = cv.threshold(gray_cell[pad:-pad, pad:-pad], 100, 255, cv.THRESH_BINARY_INV)
-            cell_filled = np.count_nonzero(pt) > 100 and np.var(gray_cell) > 500
-            out[i] = self.classifier.classify(gray_cell) if cell_filled else 0
+            # pad = 6
+            # _, pt = cv.threshold(gray_cell[pad:-pad, pad:-pad], 100, 255, cv.THRESH_BINARY_INV)
+            # cell_filled = np.count_nonzero(pt) > 100 and np.var(gray_cell) > 500
+            # out[i] = self.classifier.classify(gray_cell) if cell_filled else 0
+            out[i] = self.classifier.classify(gray_cell)
 
         det.occupied_cells = out != 0
         det.cell_values = out.reshape((9, 9))
