@@ -9,6 +9,9 @@ set(CMAKE_CXX_STANDARD 17)
 
 find_package(OpenCV 4 REQUIRED core imgcodecs imgproc highgui videoio ximgproc dnn)
 
+add_subdirectory(classifier)
+
+
 add_executable(sudoku_app
         src/app.cpp
         src/SudokuDetector.cpp include/SudokuDetector.h
@@ -17,10 +20,11 @@ add_executable(sudoku_app
         )
 target_include_directories(sudoku_app PRIVATE
         ${OpenCV_INCLUDE_DIRS}
+        digit_classifier
         include
         )
 target_link_libraries(sudoku_app PRIVATE
         ${OpenCV_LIBS}
+        digit_classifier
         )
 
-add_subdirectory(classifier)

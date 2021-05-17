@@ -4,6 +4,7 @@
 
 #ifndef SUDOKUDETECTOR_H
 #define SUDOKUDETECTOR_H
+#include "../classifier/include/CellClassifier.h"
 #include <memory>
 #include <opencv2/core.hpp>
 #include <vector>
@@ -14,6 +15,7 @@ class SudokuDetection
 class SudokuDetector
 {
     const int scaled_side_len = 1024;
+    CellClassifier cellClassifier;
 
   public:
     std::unique_ptr<SudokuDetection> detect(const cv::Mat& sudokuImage);
@@ -33,7 +35,6 @@ class SudokuDetector
                                       const cv::Size& outSize) const;
     std::pair<std::vector<cv::Mat>, std::vector<std::vector<cv::Point>>> extractCells(const cv::Mat& image);
     [[nodiscard]] cv::Mat binarizeSudoku(const cv::Mat& image) const;
-    int classify(cv::Mat cellPatch);
 };
 
 #endif // SUDOKUDETECTOR_H

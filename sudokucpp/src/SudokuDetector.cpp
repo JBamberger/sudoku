@@ -57,30 +57,15 @@ SudokuDetector::detect(const cv::Mat& sudokuImage)
             std::cerr << "Could not locate cell patch: " << i << std::endl;
             sudokuGrid[i] = 0;
         } else {
-
             cv::Mat grayCellPatch;
-
-            const int pad = 6;
             cv::cvtColor(cellPatch, grayCellPatch, cv::COLOR_BGR2GRAY);
-
-            cv::Mat threshedCellPatch;
-            const cv::Rect cropRect(pad, pad, grayCellPatch.cols - pad, grayCellPatch.rows - pad);
-            cv::threshold(grayCellPatch(cropRect), threshedCellPatch, 100, 255, cv::THRESH_BINARY_INV);
-
-            const int nnz = cv::countNonZero(threshedCellPatch);
-            cv::Scalar mean, stdDev;
-            cv::meanStdDev(grayCellPatch, mean, stdDev);
-            double variance = stdDev[0] * stdDev[0];
-            if (nnz > 100 && variance > 500.0) {
-                sudokuGrid[i] = classify(grayCellPatch);
-            } else {
-                sudokuGrid[i] = 0;
-            }
+            sudokuGrid[i] = cellClassifier.classify(grayCellPatch);
         }
     }
 
     cv::Mat canvas = warped.clone();
-    for (const auto& contour : cellCoords) {
+    for (int i = 0; i < 81; i++) {
+        const auto& contour = cellCoords.at(i);
         if (contour.empty()) {
             continue;
         }
@@ -88,16 +73,25 @@ SudokuDetector::detect(const cv::Mat& sudokuImage)
         cv::line(canvas, contour.at(1), contour.at(2), { 0, 0, 255 }, 2);
         cv::line(canvas, contour.at(2), contour.at(3), { 0, 255, 0 });
         cv::line(canvas, contour.at(3), contour.at(0), { 0, 255, 0 });
+
+        const auto p = (contour.at(0) + contour.at(1) + contour.at(2) + contour.at(3)) / 4;
+
+        const auto msg = std::to_string(sudokuGrid.at(i));
+        const auto fontFace = cv::FONT_HERSHEY_SIMPLEX;
+        const auto fontScale = 2.0;
+        const auto fontThickness = 3;
+
+        int baseline = 0;
+        auto textSize = cv::getTextSize(msg, fontFace, fontScale, fontThickness, &baseline);
+        baseline += fontThickness;
+
+        cv::Point msgOrigin(p.x - textSize.width / 2, p.y + textSize.height / 2);
+        cv::putText(canvas, msg, msgOrigin, fontFace, fontScale, { 0, 255, 0 }, fontThickness);
     }
     cv::imshow("Contours", canvas);
     cv::waitKey();
 
-    //    for (const auto& cell : cellPatches) {
-    //        cv::imshow("Cell", cell);
-    //        cv::waitKey();
-    //    }
-
-    std::cout << sudokuLocation << std::endl;
+//    std::cout << sudokuLocation << std::endl;
 
     return detection;
 }
@@ -381,6 +375,7 @@ SudokuDetector::extractCells(const cv::Mat& image)
     int pad = 3;
     int patchSize = 64;
     cv::Size paddedSize(patchSize + 2 * pad, patchSize + 2 * pad);
+    const cv::Rect2i cropRect(pad, pad, patchSize, patchSize);
 
     std::vector<std::vector<cv::Point>> cellCoordinates;
     cellCoordinates.reserve(81);
@@ -402,7 +397,7 @@ SudokuDetector::extractCells(const cv::Mat& image)
             };
 
             cv::Mat paddedCellPatch = unwarpPatch(image, transformTarget, paddedSize);
-            cellPatch = paddedCellPatch(cv::Rect(pad, pad, pad + patchSize, pad + patchSize));
+            cellPatch = paddedCellPatch(cropRect);
         }
         cellCoordinates.push_back(coordinates);
         cellPatches.push_back(cellPatch);
@@ -462,9 +457,4 @@ SudokuDetector::binarizeSudoku(const cv::Mat& image) const
     cv::medianBlur(sudoku, sudoku, 7);
 
     return sudoku;
-}
-int
-SudokuDetector::classify(cv::Mat cellPatch)
-{
-    return -1;
 }
