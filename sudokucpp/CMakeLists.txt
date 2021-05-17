@@ -4,26 +4,22 @@ cmake_minimum_required(VERSION 3.14)
 #    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
 #endif ()
 
-project(sudoku)
+project(sudoku_app CXX)
 set(CMAKE_CXX_STANDARD 17)
 
-#find_package(Torch REQUIRED)
-find_package(OpenCV 4 REQUIRED core imgcodecs imgproc highgui videoio ximgproc)
+find_package(OpenCV 4 REQUIRED core imgcodecs imgproc highgui videoio ximgproc dnn)
 
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
-
-add_executable(sudoku
+add_executable(sudoku_app
         src/app.cpp
         src/SudokuDetector.cpp include/SudokuDetector.h
         src/utils.cpp include/utils.h
-        include/config.h)
-target_include_directories(sudoku PRIVATE
+        include/config.h
+        )
+target_include_directories(sudoku_app PRIVATE
         ${OpenCV_INCLUDE_DIRS}
-#        ${TORCH_INCLUDE_DIRS}
         include
         )
-target_link_libraries(sudoku PRIVATE
-#        ${TORCH_LIBRARIES}
+target_link_libraries(sudoku_app PRIVATE
         ${OpenCV_LIBS}
         )
 

@@ -1,14 +1,9 @@
-//
-// Created by jannik on 13.04.2021.
-//
-
 #include "SudokuDetector.h"
 #include <algorithm>
 #include <array>
-#include <opencv2/imgproc.hpp>
-//#include <torch/torch.h>
 #include <cmath>
 #include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
 #include <opencv2/ximgproc.hpp>
 #include <utils.h>
 
@@ -57,33 +52,38 @@ SudokuDetector::detect(const cv::Mat& sudokuImage)
     std::fill(std::begin(sudokuGrid), std::end(sudokuGrid), 0);
     for (int i = 0; i < 81; i++) {
         const auto& cellPatch = cellPatches.at(i);
-        cv::Mat grayCellPatch;
 
-        const int pad = 6;
-        cv::cvtColor(cellPatch, grayCellPatch, cv::COLOR_BGR2GRAY);
-
-        cv::Mat threshedCellPatch;
-        const cv::Rect cropRect(pad, pad, grayCellPatch.cols - pad, grayCellPatch.rows - pad);
-        cv::threshold(grayCellPatch(cropRect), threshedCellPatch, 100, 255, cv::THRESH_BINARY_INV);
-
-        const int nnz = cv::countNonZero(threshedCellPatch);
-        cv::Scalar mean, stdDev;
-        cv::meanStdDev(grayCellPatch, mean, stdDev);
-        double variance = stdDev[0] * stdDev[0];
-        if (nnz > 100 && variance > 500.0) {
-            sudokuGrid[i] = classify(grayCellPatch);
-        } else {
+        if (cellPatch.data == nullptr) {
+            std::cerr << "Could not locate cell patch: " << i << std::endl;
             sudokuGrid[i] = 0;
+        } else {
+
+            cv::Mat grayCellPatch;
+
+            const int pad = 6;
+            cv::cvtColor(cellPatch, grayCellPatch, cv::COLOR_BGR2GRAY);
+
+            cv::Mat threshedCellPatch;
+            const cv::Rect cropRect(pad, pad, grayCellPatch.cols - pad, grayCellPatch.rows - pad);
+            cv::threshold(grayCellPatch(cropRect), threshedCellPatch, 100, 255, cv::THRESH_BINARY_INV);
+
+            const int nnz = cv::countNonZero(threshedCellPatch);
+            cv::Scalar mean, stdDev;
+            cv::meanStdDev(grayCellPatch, mean, stdDev);
+            double variance = stdDev[0] * stdDev[0];
+            if (nnz > 100 && variance > 500.0) {
+                sudokuGrid[i] = classify(grayCellPatch);
+            } else {
+                sudokuGrid[i] = 0;
+            }
         }
     }
 
-
-
-
-
-
     cv::Mat canvas = warped.clone();
     for (const auto& contour : cellCoords) {
+        if (contour.empty()) {
+            continue;
+        }
         cv::line(canvas, contour.at(0), contour.at(1), { 255, 0, 0 }, 2);
         cv::line(canvas, contour.at(1), contour.at(2), { 0, 0, 255 }, 2);
         cv::line(canvas, contour.at(2), contour.at(3), { 0, 255, 0 });
@@ -144,18 +144,18 @@ SudokuDetector::detectSudoku(const cv::Mat& normSudoku)
 
     auto points = locateSudokuContour(contours, normSudoku);
 
-//    cv::Mat canvas;
-//    cv::cvtColor(sudokuGray, canvas, cv::COLOR_GRAY2BGR);
-//    std::cout << points << std::endl;
-//    std::vector<std::vector<cv::Point>> lines;
-//    lines.push_back(points);
-//    cv::polylines(canvas, lines, true, cv::Scalar(0, 255, 0));
-//    for (int i = 0; i < points.size(); i++) {
-//        const auto& p = points.at(i);
-//        cv::putText(canvas, std::to_string(i), p, cv::FONT_HERSHEY_SIMPLEX, 1, { 0, 255, 0 });
-//    }
-//    cv::imshow("Bounds", canvas);
-//    cv::waitKey();
+    //    cv::Mat canvas;
+    //    cv::cvtColor(sudokuGray, canvas, cv::COLOR_GRAY2BGR);
+    //    std::cout << points << std::endl;
+    //    std::vector<std::vector<cv::Point>> lines;
+    //    lines.push_back(points);
+    //    cv::polylines(canvas, lines, true, cv::Scalar(0, 255, 0));
+    //    for (int i = 0; i < points.size(); i++) {
+    //        const auto& p = points.at(i);
+    //        cv::putText(canvas, std::to_string(i), p, cv::FONT_HERSHEY_SIMPLEX, 1, { 0, 255, 0 });
+    //    }
+    //    cv::imshow("Bounds", canvas);
+    //    cv::waitKey();
 
     return points;
 }
@@ -266,7 +266,7 @@ SudokuDetector::normalizeQuadOrientation(const std::vector<cv::Point>& contour, 
     bins[sortX[1]] += 1;
     bins[sortY[0]] += 1;
     bins[sortY[1]] += 1;
-//    std::cout << bins[0] << ", " << bins[1] << ", " << bins[2] << ", " << bins[3] << std::endl;
+    //    std::cout << bins[0] << ", " << bins[1] << ", " << bins[2] << ", " << bins[3] << std::endl;
 
     int offset = 0;
     for (int i = 0; i < 4; i++) {

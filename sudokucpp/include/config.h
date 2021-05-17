@@ -1,7 +1,3 @@
-//
-// Created by jannik on 17.04.2021.
-//
-
 #ifndef CONFIG_H
 #define CONFIG_H
 

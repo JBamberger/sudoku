@@ -31,7 +31,12 @@ main()
 
     std::cout << "Found " << gt.size() << " ground truth entries" << std::endl;
 
+    int sudokuNum = 0;
     for (const auto& item : gt) {
+        std::cout << "Sudoku " << sudokuNum << std::endl;
+
         processSudoku(item.first, item.second);
+
+        sudokuNum++;
     }
 }
