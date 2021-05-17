@@ -19,6 +19,7 @@ class CellClassifier
     CellClassifier& operator=(const CellClassifier&) = delete;
 
     std::vector<int> classify(const std::vector<cv::Mat>& patches);
+    int classify(const cv::Mat& patch);
 };
 
 #endif // CELLCLASSIFIER_H

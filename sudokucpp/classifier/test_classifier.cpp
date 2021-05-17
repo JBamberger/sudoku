@@ -10,14 +10,6 @@ namespace fs = std::filesystem;
 int
 main(int argc, const char* argv[])
 {
-    std::cout << "Hello" << std::endl;
-    if (argc != 2) {
-        std::cerr << "usage: example-app <path-to-exported-script-module>\n";
-        return -1;
-    }
-
-    //    fs::path imagePath("D:/dev/sudoku/data/cells/1.jpg");
-
     std::vector<fs::path> imagePaths{
         "D:/dev/sudoku/data/cells/0.jpg",  // 0: empty
         "D:/dev/sudoku/data/cells/71.jpg", // 0: garbage
@@ -59,6 +51,8 @@ main(int argc, const char* argv[])
     net.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
 
     for (const auto& grayCell : images) {
+
+//        std::cout << "Type: " << grayCell.type() << std::endl;
         cv::Mat input;
         cv::dnn::blobFromImage(grayCell, input, 1.0 / 255.0, cv::Size(), 128.0);
         cv::divide(input, 0.5, input);
