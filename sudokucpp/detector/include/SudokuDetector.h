@@ -4,7 +4,9 @@
 
 #ifndef SUDOKUDETECTOR_H
 #define SUDOKUDETECTOR_H
-#include "../classifier/include/CellClassifier.h"
+
+#include <CellClassifier.h>
+
 #include <memory>
 #include <opencv2/core.hpp>
 #include <vector>

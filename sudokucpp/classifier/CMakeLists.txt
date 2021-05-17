@@ -6,8 +6,7 @@ find_package(OpenCV 4 REQUIRED core imgcodecs imgproc)
 
 
 add_library(digit_classifier STATIC
-        "test_classifier.cpp"
-        CellClassifier.cpp include/CellClassifier.h)
+        src/CellClassifier.cpp include/CellClassifier.h)
 
 target_include_directories(digit_classifier PUBLIC
         ${OpenCV_INCLUDE_DIRS}
@@ -20,7 +19,7 @@ target_link_libraries(digit_classifier PUBLIC
         #        TorchVision::TorchVision
         )
 
-add_executable(digit_classifier_test "test_classifier.cpp")
+add_executable(digit_classifier_test src/test_classifier.cpp)
 target_include_directories(digit_classifier_test PUBLIC digit_classifier)
 target_link_libraries(digit_classifier_test PUBLIC digit_classifier)
 

@@ -1,4 +1,5 @@
-#include "SudokuDetector.h"
+#include <SudokuDetector.h>
+
 #include <algorithm>
 #include <array>
 #include <cmath>
