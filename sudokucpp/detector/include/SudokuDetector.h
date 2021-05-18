@@ -6,13 +6,11 @@
 #define SUDOKUDETECTOR_H
 
 #include <CellClassifier.h>
+#include <SudokuDetection.h>
 
 #include <memory>
 #include <opencv2/core.hpp>
 #include <vector>
-
-class SudokuDetection
-{};
 
 class SudokuDetector
 {
@@ -31,10 +29,10 @@ class SudokuDetector
                          std::vector<cv::Point>& outRect,
                          bool normalizeOrientation = true);
     void normalizeQuadOrientation(const std::vector<cv::Point>& contour, std::vector<cv::Point>& outRect);
-    std::vector<cv::Point> padContour(const std::vector<cv::Point>& contour, int padding);
-    [[nodiscard]] cv::Mat unwarpPatch(const cv::Mat& image,
-                                      const std::array<cv::Point2f, 4>& corners,
-                                      const cv::Size& outSize) const;
+    static cv::Mat getUnwarpTransform(const std::array<cv::Point2f, 4>& corners, const cv::Size& outSize);
+    [[nodiscard]] static cv::Mat unwarpPatch(const cv::Mat& image,
+                                             const std::array<cv::Point2f, 4>& corners,
+                                             const cv::Size& outSize);
     std::pair<std::vector<cv::Mat>, std::vector<std::vector<cv::Point>>> extractCells(const cv::Mat& image);
     [[nodiscard]] cv::Mat binarizeSudoku(const cv::Mat& image) const;
 };

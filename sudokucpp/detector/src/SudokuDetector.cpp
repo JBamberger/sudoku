@@ -25,29 +25,31 @@ SudokuDetector::detect(const cv::Mat& sudokuImage)
 {
 
     auto [normScaleSudoku, inputDownscale] = inputResize(sudokuImage);
+    auto detection = std::make_unique<SudokuDetection>(inputDownscale);
 
-    auto detection = std::make_unique<SudokuDetection>();
 
     auto sudokuLocation = detectSudoku(normScaleSudoku);
-
     if (sudokuLocation.empty()) {
         return detection;
     }
 
-    auto paddedLocation = padContour(sudokuLocation, 0);
+    std::array<cv::Point2f, 4> sudokuCorners{ static_cast<cv::Point2f>(sudokuLocation.at(0)) / inputDownscale,
+                                                static_cast<cv::Point2f>(sudokuLocation.at(1)) / inputDownscale,
+                                                static_cast<cv::Point2f>(sudokuLocation.at(2)) / inputDownscale,
+                                                static_cast<cv::Point2f>(sudokuLocation.at(3)) / inputDownscale };
 
-    // TODO: upscale
-    std::array<cv::Point2f, 4> scaledLocations{ static_cast<cv::Point2f>(paddedLocation.at(0)) / inputDownscale,
-                                                static_cast<cv::Point2f>(paddedLocation.at(1)) / inputDownscale,
-                                                static_cast<cv::Point2f>(paddedLocation.at(2)) / inputDownscale,
-                                                static_cast<cv::Point2f>(paddedLocation.at(3)) / inputDownscale };
+    const cv::Size scaledSudokuSize(scaled_side_len, scaled_side_len);
+    const auto unwarpTransform = getUnwarpTransform(sudokuCorners, scaledSudokuSize);
 
-    auto warped = unwarpPatch(sudokuImage, scaledLocations, cv::Size(scaled_side_len, scaled_side_len));
-    // TODO: downscale
+    cv::Mat warped;
+    cv::warpPerspective(sudokuImage, warped, unwarpTransform, scaledSudokuSize, cv::INTER_AREA);
 
-    std::vector<cv::Mat> cellPatches;
-    std::vector<std::vector<cv::Point>> cellCoords;
-    std::tie(cellPatches, cellCoords) = extractCells(warped);
+    detection->sudokuCorners = sudokuCorners;
+    detection->unwarpTransform = unwarpTransform;
+    detection->foundSudoku = true;
+
+
+    auto [cellPatches, cellCoords] = extractCells(warped);
 
     std::array<int, 81> sudokuGrid{};
     std::fill(std::begin(sudokuGrid), std::end(sudokuGrid), 0);
@@ -92,10 +94,9 @@ SudokuDetector::detect(const cv::Mat& sudokuImage)
     cv::imshow("Contours", canvas);
     cv::waitKey();
 
-//    std::cout << sudokuLocation << std::endl;
-
     return detection;
 }
+
 std::tuple<cv::Mat, double>
 SudokuDetector::inputResize(const cv::Mat& sudokuImage)
 {
@@ -109,6 +110,7 @@ SudokuDetector::inputResize(const cv::Mat& sudokuImage)
 
     return std::make_tuple(scaledImg, scale);
 }
+
 std::vector<cv::Point>
 SudokuDetector::detectSudoku(const cv::Mat& normSudoku)
 {
@@ -139,21 +141,9 @@ SudokuDetector::detectSudoku(const cv::Mat& normSudoku)
 
     auto points = locateSudokuContour(contours, normSudoku);
 
-    //    cv::Mat canvas;
-    //    cv::cvtColor(sudokuGray, canvas, cv::COLOR_GRAY2BGR);
-    //    std::cout << points << std::endl;
-    //    std::vector<std::vector<cv::Point>> lines;
-    //    lines.push_back(points);
-    //    cv::polylines(canvas, lines, true, cv::Scalar(0, 255, 0));
-    //    for (int i = 0; i < points.size(); i++) {
-    //        const auto& p = points.at(i);
-    //        cv::putText(canvas, std::to_string(i), p, cv::FONT_HERSHEY_SIMPLEX, 1, { 0, 255, 0 });
-    //    }
-    //    cv::imshow("Bounds", canvas);
-    //    cv::waitKey();
-
     return points;
 }
+
 std::vector<cv::Point>
 SudokuDetector::locateSudokuContour(const std::vector<std::vector<cv::Point>>& contours, const cv::Mat& normSudoku)
 {
@@ -195,6 +185,7 @@ SudokuDetector::locateSudokuContour(const std::vector<std::vector<cv::Point>>& c
 
     return outputPoints;
 }
+
 void
 SudokuDetector::approximateQuad(const std::vector<cv::Point>& contour,
                                 std::vector<cv::Point>& outRect,
@@ -250,6 +241,7 @@ SudokuDetector::approximateQuad(const std::vector<cv::Point>& contour,
         normalizeQuadOrientation(outRect, outRect);
     }
 }
+
 void
 SudokuDetector::normalizeQuadOrientation(const std::vector<cv::Point>& contour, std::vector<cv::Point>& outRect)
 {
@@ -296,19 +288,19 @@ SudokuDetector::normalizeQuadOrientation(const std::vector<cv::Point>& contour, 
         }
     }
 }
-std::vector<cv::Point>
-SudokuDetector::padContour(const std::vector<cv::Point>& contour, int padding)
-{
-    // TODO: add correct implementation
-    assert(padding == 0);
 
-    std::vector<cv::Point> out(contour);
-    return out;
+cv::Mat
+SudokuDetector::unwarpPatch(const cv::Mat& image, const std::array<cv::Point2f, 4>& corners, const cv::Size& outSize)
+{
+    cv::Mat M = getUnwarpTransform(corners, outSize);
+
+    cv::Mat output;
+    cv::warpPerspective(image, output, M, outSize, cv::INTER_AREA);
+
+    return output;
 }
 cv::Mat
-SudokuDetector::unwarpPatch(const cv::Mat& image,
-                            const std::array<cv::Point2f, 4>& corners,
-                            const cv::Size& outSize) const
+SudokuDetector::getUnwarpTransform(const std::array<cv::Point2f, 4>& corners, const cv::Size& outSize)
 {
     auto w = static_cast<float>(outSize.width);
     auto h = static_cast<float>(outSize.height);
@@ -319,12 +311,9 @@ SudokuDetector::unwarpPatch(const cv::Mat& image,
         cv::Point2f(0.f, h),
     };
     auto M = cv::getPerspectiveTransform(corners, destinations);
-
-    cv::Mat output;
-    cv::warpPerspective(image, output, M, outSize, cv::INTER_AREA);
-
-    return output;
+    return M;
 }
+
 std::pair<std::vector<cv::Mat>, std::vector<std::vector<cv::Point>>>
 SudokuDetector::extractCells(const cv::Mat& image)
 {
@@ -405,6 +394,7 @@ SudokuDetector::extractCells(const cv::Mat& image)
     }
     return std::make_pair(cellPatches, cellCoordinates);
 }
+
 cv::Mat
 SudokuDetector::binarizeSudoku(const cv::Mat& image) const
 {
@@ -417,41 +407,6 @@ SudokuDetector::binarizeSudoku(const cv::Mat& image) const
     cv::Mat sudoku;
     cv::ximgproc::niBlackThreshold(
       blurred, sudoku, 255, cv::THRESH_BINARY_INV, 51, 0.2, cv::ximgproc::BINARIZATION_SAUVOLA);
-
-    //    cv::Mat sudoku;
-    //    gray.convertTo(sudoku, CV_32F);
-    //    sudoku = sudoku / 255;
-
-    //    thresh_savoula(sudoku, winsize = 51);
-    //    const float r = 0.0f; // 0.5f * 255.f;
-    //    const float k = 0.2f;
-    //    const int winSize = 51;
-    //    const cv::Size2i windowSize = cv::Size(winSize, winSize);
-    //
-    //    cv::Mat mu;
-    //    cv::blur(sudoku, mu, windowSize);
-    //    cv::Mat mu2;
-    //    cv::blur(sudoku.mul(sudoku), mu2, windowSize);
-    //    cv::Mat sig;
-    //    cv::sqrt(cv::abs(mu2 - mu.mul(mu)), sig);
-    //
-    //    cv::Mat thresh = mu * (1 + k * ((sig / r) - 1));
-    //    sudoku = sudoku < thresh;
-    //
-    //    cv::imshow("mu", mu);
-    //    cv::imshow("sig", sig);
-    //    cv::imshow("thresh", thresh);
-    //    cv::imshow("sudoku", sudoku);
-    //    cv::waitKey();
-
-    //    sudoku.convertTo(sudoku, CV_8U);
-    //    sudoku = sudoku * 255;
-
-    //    if r is None:
-    //      imin, imax = dtype_limits(image, clip_negative=False)
-    //      r = 0.5 * 255
-    //    m, s = _mean_std(image, window_size)
-    //    return m * (1 + k * ((s / r) - 1))
 
     const auto kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, { 5, 5 });
     cv::dilate(sudoku, sudoku, kernel);
