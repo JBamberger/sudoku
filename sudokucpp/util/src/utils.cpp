@@ -22,6 +22,7 @@ operator>>(std::istream& str, Quad& data)
     }
     return str;
 }
+
 std::ostream&
 operator<<(std::ostream& str, const Quad& data)
 {

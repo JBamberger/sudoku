@@ -23,10 +23,10 @@ argsort(const std::vector<T>& v, std::function<bool(const T&, const T&)> comp)
 
     return idx;
 }
+
 class Quad
 {
     std::array<cv::Point2d, 4> corners;
-
 
     friend std::istream& operator>>(std::istream& str, Quad& data);
     friend std::ostream& operator<<(std::ostream& str, const Quad& data);
@@ -34,5 +34,17 @@ class Quad
 
 std::vector<std::pair<std::filesystem::path, Quad>>
 readGroundTruth(const std::filesystem::path& file);
+
+inline cv::Point
+contourCenter(const std::vector<cv::Point>& contour)
+{
+    cv::Point center(0, 0);
+    for (const auto& point : contour) {
+        center.x += point.x;
+        center.y += point.y;
+    }
+    center /= static_cast<int>(contour.size());
+    return center;
+}
 
 #endif // UTILS_H

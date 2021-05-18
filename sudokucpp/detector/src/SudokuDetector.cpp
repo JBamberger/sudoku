@@ -32,22 +32,10 @@ struct SudokuDetector::Impl
         detection->unwarpTransform = unwarpTransform;
         detection->foundSudoku = true;
 
-        auto [cellPatches, cellCoords] = extractCells(warped);
+        std::pair<std::array<cv::Mat, 81>, std::array<std::vector<cv::Point>, 81>> result;
 
-        std::array<int, 81> sudokuGrid{};
-        std::fill(std::begin(sudokuGrid), std::end(sudokuGrid), 0);
-        for (int i = 0; i < 81; i++) {
-            const auto& cellPatch = cellPatches.at(i);
-
-            if (cellPatch.data == nullptr) {
-                std::cerr << "Could not locate cell patch: " << i << std::endl;
-                sudokuGrid[i] = 0;
-            } else {
-                cv::Mat grayCellPatch;
-                cv::cvtColor(cellPatch, grayCellPatch, cv::COLOR_BGR2GRAY);
-                sudokuGrid[i] = cellClassifier.classify(grayCellPatch);
-            }
-        }
+        auto cellCoords = detectCells(warped);
+        auto sudokuGrid = classifyCells(warped, cellCoords);
 
         cv::Mat canvas = warped.clone();
         for (int i = 0; i < 81; i++) {
@@ -78,19 +66,6 @@ struct SudokuDetector::Impl
         cv::waitKey();
 
         return detection;
-    }
-
-    [[nodiscard]] std::tuple<cv::Mat, double> inputResize(const cv::Mat& sudokuImage) const
-    {
-        int h = sudokuImage.rows;
-        int w = sudokuImage.cols;
-
-        double scale = static_cast<double>(scaled_side_len) / static_cast<double>(h > w ? h : w);
-
-        cv::Mat scaledImg;
-        cv::resize(sudokuImage, scaledImg, cv::Size(), scale, scale, cv::INTER_AREA);
-
-        return std::make_tuple(scaledImg, scale);
     }
 
     bool detectSudoku(const cv::Mat& sudokuImage, std::array<cv::Point2f, 4>& sudokuCorners) const
@@ -150,10 +125,12 @@ struct SudokuDetector::Impl
         for (auto i = 0; i < contours.size(); i++) {
             const auto& contour = contours.at(i);
 
+            // Is image center contained in polygon?
             auto polytest = cv::pointPolygonTest(contour, imageCenter, false);
             if (polytest < 0)
                 continue;
 
+            // Is polygon approximately square?
             std::array<cv::Point2f, 4> points;
             cv::minAreaRect(contour).points(points.data());
 
@@ -164,6 +141,7 @@ struct SudokuDetector::Impl
             if (abs(d1 - d2) > squareThresh)
                 continue;
 
+            // Has polygon got the largest area seen until now?
             auto contourArea = cv::contourArea(contour, false);
             if (contourArea > maxArea) {
                 maxArea = contourArea;
@@ -172,11 +150,8 @@ struct SudokuDetector::Impl
         }
 
         std::vector<cv::Point> outputPoints;
-
         if (maxIndex >= 0) {
-            const auto& bestContour = contours.at(maxIndex);
-
-            approximateQuad(bestContour, outputPoints, true);
+            approximateQuad(contours.at(maxIndex), outputPoints, true);
         }
 
         return outputPoints;
@@ -294,6 +269,7 @@ struct SudokuDetector::Impl
 
         return output;
     }
+
     [[nodiscard]] static cv::Mat getUnwarpTransform(const std::array<cv::Point2f, 4>& corners, const cv::Size& outSize)
     {
         auto w = static_cast<float>(outSize.width);
@@ -308,70 +284,22 @@ struct SudokuDetector::Impl
         return M;
     }
 
-    static std::pair<std::vector<cv::Mat>, std::vector<std::vector<cv::Point>>> extractCells(const cv::Mat& image)
+    std::array<int, 81> classifyCells(const cv::Mat& image, std::array<std::vector<cv::Point>, 81>& cellCoordinates)
     {
-        auto sudoku = binarizeSudoku(image);
-
-        std::vector<std::vector<cv::Point>> contours;
-        cv::findContours(sudoku, contours, cv::RETR_CCOMP, cv::CHAIN_APPROX_SIMPLE);
-
-        std::vector<std::pair<cv::Point, std::vector<cv::Point>>> cells;
-        cells.reserve(contours.size());
-        for (const auto& contour : contours) {
-            std::vector<cv::Point> box;
-            approximateQuad(contour, box);
-
-            auto area = cv::contourArea(box);
-            if (80 * 80 <= area && area <= 120 * 120) {
-                cv::Point center(0, 0);
-                for (const auto& point : box) {
-                    center.x += point.x;
-                    center.y += point.y;
-                }
-                center /= static_cast<int>(box.size());
-                cells.emplace_back(center, box);
-            }
-        }
-
-        int step = 1024 / 9;
-        std::array<int, 81> cellToNode{};
-        cellToNode.fill(-1);
-        for (int cellIndex = 0; cellIndex < cells.size(); ++cellIndex) {
-            const auto& pair = cells.at(cellIndex);
-            auto center = pair.first;
-            auto cell = pair.second;
-
-            auto gridPoint = center / step;
-            if (!(0 <= gridPoint.x && gridPoint.x <= 1024 && 0 <= gridPoint.y && gridPoint.y <= 1024)) {
-                exit(-1);
-            }
-
-            auto p = gridPoint.x + 9 * gridPoint.y;
-            if (cellToNode.at(p) < 0) {
-                cellToNode.at(p) = cellIndex;
-            } else {
-                std::cout << "Cell at (" << gridPoint.x << "," << gridPoint.y << ") already occupied by "
-                          << cellToNode.at(p) << '.' << std::endl;
-            }
-        }
+        cv::Mat grayImage;
+        cv::cvtColor(image, grayImage, cv::COLOR_BGR2GRAY);
 
         int pad = 3;
         int patchSize = 64;
         cv::Size paddedSize(patchSize + 2 * pad, patchSize + 2 * pad);
         const cv::Rect2i cropRect(pad, pad, patchSize, patchSize);
 
-        std::vector<std::vector<cv::Point>> cellCoordinates;
-        cellCoordinates.reserve(81);
-        std::vector<cv::Mat> cellPatches;
+        std::array<int, 81> sudokuGrid{};
+        std::fill(std::begin(sudokuGrid), std::end(sudokuGrid), -1);
         for (int i = 0; i < 81; i++) {
-            int nodeIndex = cellToNode.at(i);
+            const auto& coordinates = cellCoordinates.at(i);
 
-            std::vector<cv::Point> coordinates;
-            cv::Mat cellPatch;
-
-            if (nodeIndex >= 0) {
-                coordinates = cells.at(nodeIndex).second;
-
+            if (!coordinates.empty()) {
                 std::array<cv::Point2f, 4> transformTarget{
                     static_cast<cv::Point2f>(coordinates.at(0)),
                     static_cast<cv::Point2f>(coordinates.at(1)),
@@ -379,13 +307,46 @@ struct SudokuDetector::Impl
                     static_cast<cv::Point2f>(coordinates.at(3)),
                 };
 
-                cv::Mat paddedCellPatch = unwarpPatch(image, transformTarget, paddedSize);
-                cellPatch = paddedCellPatch(cropRect);
+                const auto paddedCellPatch = unwarpPatch(grayImage, transformTarget, paddedSize);
+                const auto cellPatch = paddedCellPatch(cropRect);
+                sudokuGrid[i] = cellClassifier.classify(cellPatch);
             }
-            cellCoordinates.push_back(coordinates);
-            cellPatches.push_back(cellPatch);
         }
-        return std::make_pair(cellPatches, cellCoordinates);
+
+        return sudokuGrid;
+    }
+    static std::array<std::vector<cv::Point>, 81> detectCells(const cv::Mat& image)
+    {
+        auto sudoku = binarizeSudoku(image);
+
+        std::vector<std::vector<cv::Point>> contours;
+        cv::findContours(sudoku, contours, cv::RETR_CCOMP, cv::CHAIN_APPROX_SIMPLE);
+
+        // Select all candidates with area in the given size range and compute the approximate quad.
+        std::array<std::vector<cv::Point>, 81> cellCoordinates{};
+        for (const auto& contour : contours) {
+            std::vector<cv::Point> cellCandidate;
+            approximateQuad(contour, cellCandidate);
+
+            auto area = cv::contourArea(cellCandidate);
+
+            // The box is outside of the required size range.
+            if (80 * 80 > area || area > 120 * 120) {
+                continue;
+            }
+
+            // Grid cell in the sudoku occupied by the current cell candidate.
+            auto gridPoint = contourCenter(cellCandidate) / (1024 / 9);
+            assert(0 <= gridPoint.x && gridPoint.x <= 1024 && 0 <= gridPoint.y && gridPoint.y <= 1024);
+
+            auto nodeIndex = gridPoint.x + 9 * gridPoint.y;
+            if (cellCoordinates.at(nodeIndex).empty()) {
+                cellCoordinates.at(nodeIndex) = cellCandidate;
+            } else {
+                std::cout << "Cell at (" << gridPoint.x << "," << gridPoint.y << ") already occupied." << std::endl;
+            }
+        }
+        return cellCoordinates;
     }
 
     [[nodiscard]] static cv::Mat binarizeSudoku(const cv::Mat& image)
