@@ -1,24 +1,13 @@
 #include <SudokuDetector.h>
 
+#include <mathutil.h>
+#include <utils.h>
+
 #include <algorithm>
 #include <array>
-#include <cmath>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/ximgproc.hpp>
-#include <utils.h>
-
-#define M_PI 3.14159265358979323846
-
-template<typename T>
-T
-orientedAngle(const T& x1, const T& y1, const T& x2, const T& y2)
-{
-    auto dot = x1 * x2 + y1 * y2;
-    auto det = x1 * y2 - y1 * x2;
-    auto angle = std::atan2(det, dot);
-    return angle;
-}
 
 struct SudokuDetector::Impl
 {
@@ -27,27 +16,19 @@ struct SudokuDetector::Impl
 
     std::unique_ptr<SudokuDetection> detect(const cv::Mat& sudokuImage)
     {
+        // Data class to hold the results
+        auto detection = std::make_unique<SudokuDetection>();
 
-        auto [normScaleSudoku, inputDownscale] = inputResize(sudokuImage);
-        auto detection = std::make_unique<SudokuDetection>(inputDownscale);
-
-        auto sudokuLocation = detectSudoku(normScaleSudoku);
-        if (sudokuLocation.empty()) {
+        if (!detectSudoku(sudokuImage, detection->sudokuCorners)) {
             return detection;
         }
 
-        std::array<cv::Point2f, 4> sudokuCorners{ static_cast<cv::Point2f>(sudokuLocation.at(0)) / inputDownscale,
-                                                  static_cast<cv::Point2f>(sudokuLocation.at(1)) / inputDownscale,
-                                                  static_cast<cv::Point2f>(sudokuLocation.at(2)) / inputDownscale,
-                                                  static_cast<cv::Point2f>(sudokuLocation.at(3)) / inputDownscale };
-
         const cv::Size scaledSudokuSize(scaled_side_len, scaled_side_len);
-        const auto unwarpTransform = getUnwarpTransform(sudokuCorners, scaledSudokuSize);
+        const auto unwarpTransform = getUnwarpTransform(detection->sudokuCorners, scaledSudokuSize);
 
         cv::Mat warped;
         cv::warpPerspective(sudokuImage, warped, unwarpTransform, scaledSudokuSize, cv::INTER_AREA);
 
-        detection->sudokuCorners = sudokuCorners;
         detection->unwarpTransform = unwarpTransform;
         detection->foundSudoku = true;
 
@@ -112,45 +93,60 @@ struct SudokuDetector::Impl
         return std::make_tuple(scaledImg, scale);
     }
 
-    static std::vector<cv::Point> detectSudoku(const cv::Mat& normSudoku)
+    bool detectSudoku(const cv::Mat& sudokuImage, std::array<cv::Point2f, 4>& sudokuCorners) const
     {
-        cv::Mat sudokuGray;
-        cv::cvtColor(normSudoku, sudokuGray, cv::COLOR_BGR2GRAY);
+        // Work in grayscale. Color is not necessary here.
+        cv::Mat graySudoku;
+        cv::cvtColor(sudokuImage, graySudoku, cv::COLOR_BGR2GRAY);
 
+        // Scale longer side to scaled_side_len
+        int h = sudokuImage.rows;
+        int w = sudokuImage.cols;
+        double scale = static_cast<double>(scaled_side_len) / static_cast<double>(h > w ? h : w);
+        cv::Mat normSudoku;
+        cv::resize(graySudoku, normSudoku, cv::Size(), scale, scale, cv::INTER_AREA);
+
+        // More or less adaptive thresholding but with less noisy results.
         cv::Mat closingKernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(25, 25));
         cv::Mat closing;
-        cv::morphologyEx(sudokuGray, closing, cv::MORPH_CLOSE, closingKernel);
-
-        sudokuGray = (sudokuGray / closing * 255); // TODO: requires casting.
-        //    cv::Mat tempMat;
-        //    sudokuGray.convertTo(tempMat, CV_32F);
-        //    tempMat = (tempMat / closing * 255); // TODO: requires casting.
-        //    tempMat.convertTo(sudokuGray, CV_8U);
+        cv::morphologyEx(normSudoku, closing, cv::MORPH_CLOSE, closingKernel);
+        normSudoku = (normSudoku / closing * 255);
 
         cv::Mat sudokuBin;
-        // TODO: might require | or  & instead of +
-        cv::threshold(sudokuGray, sudokuBin, 0, 255, cv::THRESH_BINARY_INV + cv::THRESH_OTSU);
+        cv::threshold(normSudoku, sudokuBin, 0, 255, cv::THRESH_BINARY_INV + cv::THRESH_OTSU);
 
+        // Slight dilation to fill in holes in the lines
         cv::Mat dilationKernel;
         cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5));
         cv::Mat dilated;
         cv::dilate(sudokuBin, dilated, dilationKernel);
 
+        // Contour detection
         std::vector<std::vector<cv::Point>> contours;
         cv::findContours(dilated, contours, cv::RETR_CCOMP, cv::CHAIN_APPROX_SIMPLE);
 
-        auto points = locateSudokuContour(contours, normSudoku);
+        cv::Point2f imageCenter(static_cast<float>(normSudoku.cols) / 2.f, static_cast<float>(normSudoku.rows) / 2.f);
+        auto sudokuLocation = locateSudokuContour(contours, imageCenter);
+        if (sudokuLocation.empty()) {
+            // could not localize the sudoku
+            return false;
+        }
 
-        return points;
+        // Undo scaling performed earlier to obtain sudoku corners in original image space
+        sudokuCorners[0] = static_cast<cv::Point2f>(sudokuLocation.at(0)) / scale;
+        sudokuCorners[1] = static_cast<cv::Point2f>(sudokuLocation.at(1)) / scale;
+        sudokuCorners[2] = static_cast<cv::Point2f>(sudokuLocation.at(2)) / scale;
+        sudokuCorners[3] = static_cast<cv::Point2f>(sudokuLocation.at(3)) / scale;
+
+        return true;
     }
 
     static std::vector<cv::Point> locateSudokuContour(const std::vector<std::vector<cv::Point>>& contours,
-                                                      const cv::Mat& normSudoku)
+                                                      const cv::Point2f& imageCenter)
     {
 
         double maxArea = 0.0;
         int maxIndex = -1;
-        cv::Point2f imageCenter(static_cast<float>(normSudoku.cols) / 2.f, static_cast<float>(normSudoku.rows) / 2.f);
         for (auto i = 0; i < contours.size(); i++) {
             const auto& contour = contours.at(i);
 

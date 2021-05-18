@@ -14,8 +14,6 @@
 
 struct SudokuDetection
 {
-    const double inputScale;
-
     std::array<cv::Point2f, 4> sudokuCorners;
     cv::Mat unwarpTransform;
     bool foundSudoku = false;
@@ -23,9 +21,6 @@ struct SudokuDetection
     std::array<std::vector<cv::Point2f>, 81> cells;
     std::array<int, 81> cellLabels;
     bool foundAllCells = false;
-
-    explicit SudokuDetection(double inputScale);
-    ~SudokuDetection();
 
     void drawSudokuBounds(cv::Mat& canvas) const;
     void drawCells(cv::Mat& canvas) const;
