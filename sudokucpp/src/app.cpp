@@ -1,6 +1,7 @@
 #include <SudokuDetector.h>
 
 #include <config.h>
+#include <drawutil.h>
 #include <utils.h>
 
 #include <filesystem>
@@ -9,13 +10,42 @@
 
 namespace fs = std::filesystem;
 
-void
-processSudoku(const fs::path& path, const Quad& gt_bbox)
+class SudokuApplication
 {
-    cv::Mat sudokuImg = cv::imread(path.string(), cv::IMREAD_COLOR);
-    auto detector = SudokuDetector();
-    auto detection = detector.detect(sudokuImg);
-}
+    std::unique_ptr<SudokuDetector> detector;
+
+  public:
+    explicit SudokuApplication()
+      : detector(std::make_unique<SudokuDetector>())
+    {}
+
+    void loop(const std::vector<std::pair<std::filesystem::path, Quad>>& groundTruth) const
+    {
+        int sudokuNum = 0;
+        for (const auto& item : groundTruth) {
+            std::cout << "Sudoku " << sudokuNum << std::endl;
+
+            processSudoku(item.first, item.second);
+
+            sudokuNum++;
+        }
+    }
+
+  private:
+    void processSudoku(const fs::path& path, const Quad& gt_bbox) const
+    {
+        cv::Mat sudokuImg = cv::imread(path.string(), cv::IMREAD_COLOR);
+        auto detection = detector->detect(sudokuImg);
+
+        cv::Mat canvas = sudokuImg.clone();
+
+        detection->drawOverlay(canvas);
+
+        auto [scale, resizedCanvas] = resizeMaxSideLen(canvas, 1024);
+        cv::imshow("Sudoku", resizedCanvas);
+        cv::waitKey();
+    }
+};
 
 int
 main()
@@ -25,12 +55,6 @@ main()
     std::cout << "OpenCV Version: " << cv::getVersionString() << std::endl;
     std::cout << "Found " << gt.size() << " ground truth entries" << std::endl;
 
-    int sudokuNum = 0;
-    for (const auto& item : gt) {
-        std::cout << "Sudoku " << sudokuNum << std::endl;
-
-        processSudoku(item.first, item.second);
-
-        sudokuNum++;
-    }
+    const auto app = SudokuApplication();
+    app.loop(gt);
 }

@@ -1,5 +1,6 @@
 #include <SudokuDetector.h>
 
+#include <drawutil.h>
 #include <mathutil.h>
 #include <utils.h>
 
@@ -24,46 +25,36 @@ struct SudokuDetector::Impl
         }
 
         const cv::Size scaledSudokuSize(scaled_side_len, scaled_side_len);
-        const auto unwarpTransform = getUnwarpTransform(detection->sudokuCorners, scaledSudokuSize);
-
-        cv::Mat warped;
-        cv::warpPerspective(sudokuImage, warped, unwarpTransform, scaledSudokuSize, cv::INTER_AREA);
-
-        detection->unwarpTransform = unwarpTransform;
+        detection->unwarpTransform = getUnwarpTransform(detection->sudokuCorners, scaledSudokuSize);
         detection->foundSudoku = true;
 
-        std::pair<std::array<cv::Mat, 81>, std::array<std::vector<cv::Point>, 81>> result;
+        cv::Mat warped;
+        cv::warpPerspective(sudokuImage, warped, detection->unwarpTransform, scaledSudokuSize, cv::INTER_AREA);
 
-        auto cellCoords = detectCells(warped);
-        auto sudokuGrid = classifyCells(warped, cellCoords);
+        detectCells(warped, detection->cellCoords);
+        classifyCells(warped, detection->cellCoords, detection->cellLabels);
+        detection->foundAllCells =
+          std::all_of(std::begin(detection->cellLabels), std::end(detection->cellLabels), [](int i) { return i >= 0; });
 
-        cv::Mat canvas = warped.clone();
-        for (int i = 0; i < 81; i++) {
-            const auto& contour = cellCoords.at(i);
-            if (contour.empty()) {
-                continue;
-            }
-            cv::line(canvas, contour.at(0), contour.at(1), { 255, 0, 0 }, 2);
-            cv::line(canvas, contour.at(1), contour.at(2), { 0, 0, 255 }, 2);
-            cv::line(canvas, contour.at(2), contour.at(3), { 0, 255, 0 });
-            cv::line(canvas, contour.at(3), contour.at(0), { 0, 255, 0 });
-
-            const auto p = (contour.at(0) + contour.at(1) + contour.at(2) + contour.at(3)) / 4;
-
-            const auto msg = std::to_string(sudokuGrid.at(i));
-            const auto fontFace = cv::FONT_HERSHEY_SIMPLEX;
-            const auto fontScale = 2.0;
-            const auto fontThickness = 3;
-
-            int baseline = 0;
-            auto textSize = cv::getTextSize(msg, fontFace, fontScale, fontThickness, &baseline);
-            baseline += fontThickness;
-
-            cv::Point msgOrigin(p.x - textSize.width / 2, p.y + textSize.height / 2);
-            cv::putText(canvas, msg, msgOrigin, fontFace, fontScale, { 0, 255, 0 }, fontThickness);
-        }
-        cv::imshow("Contours", canvas);
-        cv::waitKey();
+        //        cv::Mat canvas = warped.clone();
+        ////        for (int i = 0; i < 81; i++) {
+        ////            const auto& contour = detection->cellCoords.at(i);
+        ////            if (contour.empty()) {
+        ////                continue;
+        ////            }
+        ////
+        ////            drawOrientedRect(canvas, contour);
+        ////
+        ////            const auto msg = std::to_string(detection->cellLabels.at(i));
+        ////            const auto center = contourCenter(contour);
+        ////            drawCenteredText(canvas, msg, center);
+        ////        }
+        //
+        //        cv::Mat overlay = detection->renderOverlay(scaled_side_len, scaled_side_len);
+        //        cv::Mat composite = compositeImage(canvas, overlay);
+        //
+        //        cv::imshow("Contours", composite);
+        //        cv::waitKey();
 
         return detection;
     }
@@ -75,11 +66,7 @@ struct SudokuDetector::Impl
         cv::cvtColor(sudokuImage, graySudoku, cv::COLOR_BGR2GRAY);
 
         // Scale longer side to scaled_side_len
-        int h = sudokuImage.rows;
-        int w = sudokuImage.cols;
-        double scale = static_cast<double>(scaled_side_len) / static_cast<double>(h > w ? h : w);
-        cv::Mat normSudoku;
-        cv::resize(graySudoku, normSudoku, cv::Size(), scale, scale, cv::INTER_AREA);
+        auto [scale, normSudoku] = resizeMaxSideLen(graySudoku, scaled_side_len);
 
         // More or less adaptive thresholding but with less noisy results.
         cv::Mat closingKernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(25, 25));
@@ -284,7 +271,9 @@ struct SudokuDetector::Impl
         return M;
     }
 
-    std::array<int, 81> classifyCells(const cv::Mat& image, std::array<std::vector<cv::Point>, 81>& cellCoordinates)
+    void classifyCells(const cv::Mat& image,
+                       std::array<std::vector<cv::Point>, 81>& cellCoordinates,
+                       std::array<int, 81>& cellLabels)
     {
         cv::Mat grayImage;
         cv::cvtColor(image, grayImage, cv::COLOR_BGR2GRAY);
@@ -294,8 +283,7 @@ struct SudokuDetector::Impl
         cv::Size paddedSize(patchSize + 2 * pad, patchSize + 2 * pad);
         const cv::Rect2i cropRect(pad, pad, patchSize, patchSize);
 
-        std::array<int, 81> sudokuGrid{};
-        std::fill(std::begin(sudokuGrid), std::end(sudokuGrid), -1);
+        std::fill(std::begin(cellLabels), std::end(cellLabels), -1);
         for (int i = 0; i < 81; i++) {
             const auto& coordinates = cellCoordinates.at(i);
 
@@ -309,13 +297,12 @@ struct SudokuDetector::Impl
 
                 const auto paddedCellPatch = unwarpPatch(grayImage, transformTarget, paddedSize);
                 const auto cellPatch = paddedCellPatch(cropRect);
-                sudokuGrid[i] = cellClassifier.classify(cellPatch);
+                cellLabels[i] = cellClassifier.classify(cellPatch);
             }
         }
-
-        return sudokuGrid;
     }
-    static std::array<std::vector<cv::Point>, 81> detectCells(const cv::Mat& image)
+
+    static void detectCells(const cv::Mat& image, std::array<std::vector<cv::Point>, 81>& cellCoords)
     {
         auto sudoku = binarizeSudoku(image);
 
@@ -323,7 +310,6 @@ struct SudokuDetector::Impl
         cv::findContours(sudoku, contours, cv::RETR_CCOMP, cv::CHAIN_APPROX_SIMPLE);
 
         // Select all candidates with area in the given size range and compute the approximate quad.
-        std::array<std::vector<cv::Point>, 81> cellCoordinates{};
         for (const auto& contour : contours) {
             std::vector<cv::Point> cellCandidate;
             approximateQuad(contour, cellCandidate);
@@ -340,13 +326,12 @@ struct SudokuDetector::Impl
             assert(0 <= gridPoint.x && gridPoint.x <= 1024 && 0 <= gridPoint.y && gridPoint.y <= 1024);
 
             auto nodeIndex = gridPoint.x + 9 * gridPoint.y;
-            if (cellCoordinates.at(nodeIndex).empty()) {
-                cellCoordinates.at(nodeIndex) = cellCandidate;
+            if (cellCoords.at(nodeIndex).empty()) {
+                cellCoords.at(nodeIndex) = cellCandidate;
             } else {
                 std::cout << "Cell at (" << gridPoint.x << "," << gridPoint.y << ") already occupied." << std::endl;
             }
         }
-        return cellCoordinates;
     }
 
     [[nodiscard]] static cv::Mat binarizeSudoku(const cv::Mat& image)

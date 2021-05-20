@@ -7,8 +7,8 @@
 
 #include <array>
 #include <memory>
-#include <opencv2/core/types.hpp>
 #include <opencv2/core/mat.hpp>
+#include <opencv2/core/types.hpp>
 #include <utility>
 #include <vector>
 
@@ -18,15 +18,11 @@ struct SudokuDetection
     cv::Mat unwarpTransform;
     bool foundSudoku = false;
 
-    std::array<std::vector<cv::Point2f>, 81> cells;
+    std::array<std::vector<cv::Point>, 81> cellCoords;
     std::array<int, 81> cellLabels;
     bool foundAllCells = false;
 
-    void drawSudokuBounds(cv::Mat& canvas) const;
-    void drawCells(cv::Mat& canvas) const;
-    void drawLabels(cv::Mat& canvas, bool drawEmpty) const;
-
-    cv::Mat renderOverlay() const;
+    void drawOverlay(cv::Mat& canvas) const;
 };
 
 #endif // SUDOKUDETECTION_H

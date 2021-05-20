@@ -35,16 +35,19 @@ class Quad
 std::vector<std::pair<std::filesystem::path, Quad>>
 readGroundTruth(const std::filesystem::path& file);
 
-inline cv::Point
-contourCenter(const std::vector<cv::Point>& contour)
+template<typename T>
+cv::Point_<T>
+contourCenter(const std::vector<cv::Point_<T>>& contour)
 {
-    cv::Point center(0, 0);
+    cv::Point_<T> center(0, 0);
     for (const auto& point : contour) {
         center.x += point.x;
         center.y += point.y;
     }
-    center /= static_cast<int>(contour.size());
+    center /= static_cast<T>(contour.size());
     return center;
 }
+
+
 
 #endif // UTILS_H
