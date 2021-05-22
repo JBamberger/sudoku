@@ -1,4 +1,4 @@
-find_package(OpenCV 4 REQUIRED core imgcodecs imgproc highgui videoio ximgproc dnn)
+find_package(OpenCV 4 REQUIRED core imgcodecs imgproc highgui videoio dnn) # ximgproc
 
 add_library(sudoku_detector STATIC
         src/SudokuDetector.cpp include/SudokuDetector.h

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <fstream>
+#include <sstream>
 
 std::istream&
 operator>>(std::istream& str, Quad& data)
