@@ -9,6 +9,7 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/ximgproc.hpp>
+#include <ximgproc_compat.h>
 
 struct SudokuDetector::Impl
 {
@@ -343,8 +344,9 @@ struct SudokuDetector::Impl
         cv::GaussianBlur(gray, blurred, { 5, 5 }, 0);
 
         cv::Mat sudoku;
-        cv::ximgproc::niBlackThreshold(
-          blurred, sudoku, 255, cv::THRESH_BINARY_INV, 51, 0.2, cv::ximgproc::BINARIZATION_SAUVOLA);
+//        cv::ximgproc::niBlackThreshold(
+//          blurred, sudoku, 255, cv::THRESH_BINARY_INV, 51, 0.2, cv::ximgproc::BINARIZATION_SAUVOLA);
+        savoulaThreshInv(blurred, sudoku, 255, 51, 0.2);
 
         const auto kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, { 5, 5 });
         cv::dilate(sudoku, sudoku, kernel);
