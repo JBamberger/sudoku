@@ -48,9 +48,20 @@ class SudokuApplication
 };
 
 int
-main()
+main(int argc, char* argv[])
 {
-    auto gt = readGroundTruth(sudokusGtPath);
+    if (argc < 2) {
+        std::cerr << "Missing ground truth arg. Call as app.exe <path-to-gt>" << std::endl;
+        exit(1);
+    }
+
+    fs::path gtPath(argv[1]);
+    if (!fs::exists(gtPath) || !fs::is_regular_file(gtPath)) {
+        std::cerr << "The specified gt path is not a file." << std::endl;
+        exit(1);
+    }
+
+    auto gt = readGroundTruth(gtPath);
 
     std::cout << "OpenCV Version: " << cv::getVersionString() << std::endl;
     std::cout << "Found " << gt.size() << " ground truth entries" << std::endl;
