@@ -18,7 +18,7 @@ class SudokuDetector
     std::unique_ptr<Impl> pimpl;
 
   public:
-    explicit SudokuDetector();
+    explicit SudokuDetector(const std::string& classifierPath);
     SudokuDetector(SudokuDetector&&) noexcept;
     SudokuDetector(const SudokuDetector&) = delete;
     ~SudokuDetector();

@@ -17,6 +17,8 @@ struct SudokuDetector::Impl
     const int scaled_side_len = 1024;
     CellClassifier cellClassifier;
 
+    explicit Impl(const std::string& classifierPath): cellClassifier(classifierPath) {}
+
     std::unique_ptr<SudokuDetection> detect(const cv::Mat& sudokuImage)
     {
         // Data class to hold the results
@@ -363,8 +365,8 @@ struct SudokuDetector::Impl
     }
 };
 
-SudokuDetector::SudokuDetector()
-  : pimpl(std::make_unique<Impl>())
+SudokuDetector::SudokuDetector(const std::string& classifierPath)
+  : pimpl(std::make_unique<Impl>(classifierPath))
 {}
 
 SudokuDetector::SudokuDetector(SudokuDetector&&) noexcept = default;

@@ -60,8 +60,8 @@ struct CellClassifier::Impl
     }
 };
 
-CellClassifier::CellClassifier()
-  : pimpl{ std::make_unique<Impl>("D:/dev/sudoku/share/digit_classifier_ts.onnx") }
+CellClassifier::CellClassifier(const std::string& classifierPath)
+  : pimpl{ std::make_unique<Impl>(classifierPath) }
 {}
 
 CellClassifier::CellClassifier(CellClassifier&&) noexcept = default;

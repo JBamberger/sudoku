@@ -11,7 +11,7 @@ class CellClassifier
     std::unique_ptr<Impl> pimpl;
 
   public:
-    explicit CellClassifier();
+    explicit CellClassifier(const std::string& classifierPath);
     CellClassifier(CellClassifier&&) noexcept;
     CellClassifier(const CellClassifier&) = delete;
     ~CellClassifier();

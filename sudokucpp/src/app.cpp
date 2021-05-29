@@ -16,7 +16,7 @@ class SudokuApplication
 
   public:
     explicit SudokuApplication()
-      : detector(std::make_unique<SudokuDetector>())
+      : detector(std::make_unique<SudokuDetector>("D:/dev/sudoku/share/digit_classifier_ts.onnx"))
     {}
 
     void loop(const std::vector<std::pair<std::filesystem::path, Quad>>& groundTruth) const
