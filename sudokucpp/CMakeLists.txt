@@ -12,6 +12,7 @@ find_package(OpenCV 4 REQUIRED core imgcodecs imgproc highgui videoio dnn)# ximg
 add_subdirectory(util)
 add_subdirectory(detector)
 add_subdirectory(classifier)
+add_subdirectory(solver)
 
 
 add_executable(sudoku_app src/app.cpp)
