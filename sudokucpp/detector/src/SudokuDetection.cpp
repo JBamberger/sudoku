@@ -7,6 +7,9 @@ void
 SudokuDetection::drawOverlay(cv::Mat& canvas) const
 {
     assert(foundSudoku);
+    const cv::Scalar CELL_SUDOKU_COLOR = { 0, 255, 0 };
+    const cv::Scalar CELL_SOLUTION_COLOR = { 0, 0, 255 };
+
     drawOrientedRect(canvas, asContour(sudokuCorners));
 
     cv::Mat M;
@@ -30,8 +33,19 @@ SudokuDetection::drawOverlay(cv::Mat& canvas) const
 
         drawOrientedRect(canvas, contour);
 
-        const auto msg = std::to_string(cellLabels.at(i));
+        int cellNum = cellLabels.at(i);
+        auto color = CELL_SUDOKU_COLOR;
+        if (solution != nullptr) {
+            if (cellNum <= 0) {
+                color = CELL_SOLUTION_COLOR;
+                cellNum = solution->at(i);
+            } else {
+                assert(cellNum == solution->at(i));
+            }
+        }
+
         const auto center = contourCenter(contour);
-        drawCenteredText(canvas, msg, center);
+        const auto msg = std::to_string(cellNum);
+        drawCenteredText(canvas, msg, center, color);
     }
 }

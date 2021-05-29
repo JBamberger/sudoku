@@ -34,7 +34,10 @@ drawOrientedRect(cv::Mat& canvas, const std::vector<cv::Point_<T>>& contour)
 }
 
 inline void
-drawCenteredText(cv::Mat& canvas, const std::string& msg, const cv::Point& center)
+drawCenteredText(cv::Mat& canvas,
+                 const std::string& msg,
+                 const cv::Point& center,
+                 const cv::Scalar& color = { 0, 255, 0 })
 {
     const auto fontFace = cv::FONT_HERSHEY_SIMPLEX;
     const auto fontScale = 2.0;
@@ -45,7 +48,7 @@ drawCenteredText(cv::Mat& canvas, const std::string& msg, const cv::Point& cente
     baseline += fontThickness;
 
     cv::Point msgOrigin(center.x - textSize.width / 2, center.y + textSize.height / 2);
-    cv::putText(canvas, msg, msgOrigin, fontFace, fontScale, { 0, 255, 0 }, fontThickness);
+    cv::putText(canvas, msg, msgOrigin, fontFace, fontScale, color, fontThickness);
 }
 
 inline cv::Mat
@@ -82,7 +85,9 @@ renderWarped(const cv::Mat& canvas, const cv::Mat& overlay, const cv::Mat& trans
     return compositeImage(canvas, warpedOverlay);
 }
 
-inline std::tuple<double, cv::Mat> resizeMaxSideLen(const cv::Mat& input, int maxSideLen) {
+inline std::tuple<double, cv::Mat>
+resizeMaxSideLen(const cv::Mat& input, int maxSideLen)
+{
     int h = input.rows;
     int w = input.cols;
     double scale = static_cast<double>(maxSideLen) / static_cast<double>(h > w ? h : w);

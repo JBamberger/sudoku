@@ -1,5 +1,6 @@
 #include <SudokuDetector.h>
 
+#include <SudokuSolver.h>
 #include <drawutil.h>
 #include <mathutil.h>
 #include <utils.h>
@@ -36,6 +37,12 @@ struct SudokuDetector::Impl
         classifyCells(warped, detection->cellCoords, detection->cellLabels);
         detection->foundAllCells =
           std::all_of(std::begin(detection->cellLabels), std::end(detection->cellLabels), [](int i) { return i >= 0; });
+
+        if (detection->foundAllCells) {
+            SudokuSolver solver;
+
+            detection->solution = solver.solve(detection->cellLabels);
+        }
 
         //        cv::Mat canvas = warped.clone();
         ////        for (int i = 0; i < 81; i++) {
@@ -344,8 +351,8 @@ struct SudokuDetector::Impl
         cv::GaussianBlur(gray, blurred, { 5, 5 }, 0);
 
         cv::Mat sudoku;
-//        cv::ximgproc::niBlackThreshold(
-//          blurred, sudoku, 255, cv::THRESH_BINARY_INV, 51, 0.2, cv::ximgproc::BINARIZATION_SAUVOLA);
+        //        cv::ximgproc::niBlackThreshold(
+        //          blurred, sudoku, 255, cv::THRESH_BINARY_INV, 51, 0.2, cv::ximgproc::BINARIZATION_SAUVOLA);
         savoulaThreshInv(blurred, sudoku, 255, 51, 0.2);
 
         const auto kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, { 5, 5 });

@@ -22,6 +22,8 @@ struct SudokuDetection
     std::array<int, 81> cellLabels;
     bool foundAllCells = false;
 
+    std::unique_ptr<std::array<int, 81>> solution;
+
     void drawOverlay(cv::Mat& canvas) const;
 };
 

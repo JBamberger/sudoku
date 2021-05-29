@@ -7,10 +7,12 @@ target_include_directories(sudoku_detector PUBLIC
         ${OpenCV_INCLUDE_DIRS}
         sudoku_utils
         digit_classifier
+        sudoku_solver
         include
         )
 target_link_libraries(sudoku_detector PUBLIC
         ${OpenCV_LIBS}
         sudoku_utils
         digit_classifier
+        sudoku_solver
         )
