@@ -108,64 +108,76 @@ struct SudokuSolver::Impl
     std::unique_ptr<SudokuGrid> solve(const SudokuGrid& sudokuGrid)
     {
         Sudoku sudoku(sudokuGrid);
-        //        std::cout << "Depth: " << std::setw(2) << 0 << "                  // ";
-        //        printGrid(sudoku.grid);
-        return _solve(sudoku, 0);
+        return _solve(sudoku);
     }
-    std::unique_ptr<SudokuGrid> _solve(Sudoku& sudoku, int depth)
+    std::unique_ptr<SudokuGrid> _solve(Sudoku& sudoku)
     {
+//        std::vector<Sudoku> stack;
+//        stack.push_back(sudoku);
+//
+//        while (!stack.empty()) {
+//            // solve trivial
+//            // select cell
+//            // compute candidates
+//            // for each candidate:
+//            //  create copy and try candidate
+//            //  on success return
+//            //  on error backtrack
+//        }
+
         while (true) {
             SolveState solveResult = sudoku.solveTrivial();
-            if (solveResult == SolveState::MODIFIED) {
-                // Changed, do another iteration because new possibilities might have appeared.
-                continue;
+            if (solveResult == SolveState::UNMODIFIED) {
+                // Not changed, need to try a cell value and backtrack if erroneous
+                break;
             } else if (solveResult == SolveState::SOLVED) {
                 return std::make_unique<SudokuGrid>(sudoku.grid);
             } else if (solveResult == SolveState::UNSOLVABLE) {
                 return nullptr;
             }
+        }
 
-            size_t minCandidates = Sudoku::SIZE + 1;
-            int bestRow = -1, bestCol = -1;
-            for (int row = 0; row < Sudoku::SIZE; row++) {
-                for (int col = 0; col < Sudoku::SIZE; col++) {
-                    if (sudoku.isCellFilled(row, col)) {
-                        // Cell is already filled. No further checks necessary.
-                        continue;
-                    }
-                    size_t numCandidates = sudoku.getCellPossibilities(row, col).size();
-                    if (1 < numCandidates && numCandidates < minCandidates) {
-                        bestRow = row;
-                        bestCol = col;
-                        minCandidates = numCandidates;
-                    }
-                }
-            }
-            if (minCandidates > Sudoku::SIZE) {
-                std::cout << "Error: invalid sudoku" << std::endl;
-                return nullptr;
-            }
-
-            const auto candidates = sudoku.getCellPossibilities(bestRow, bestCol);
-            for (const auto candidate : candidates) {
-                Sudoku sudokuCopy(sudoku);
-                sudokuCopy.at(bestRow, bestCol) = candidate;
-
-                //                std::cout << "d: " << std::setw(2) << depth + 1          //
-                //                          << " nc:" << std::setw(2) << candidates.size() //
-                //                          << " r:" << std::setw(2) << bestRow            //
-                //                          << " c:" << std::setw(2) << bestCol            //
-                //                          << " v:" << std::setw(2) << candidate          //
-                //                          << " // ";
-                //                printGrid(sudokuCopy.grid);
-                auto solution = _solve(sudokuCopy, depth + 1);
-                if (solution != nullptr) {
-                    return solution;
-                }
-                // Not a solution, backtrack.
-            }
+        int bestRow;
+        int bestCol;
+        if (!selectNextCell(sudoku, bestRow, bestCol)) {
+            std::cout << "Error: invalid sudoku" << std::endl;
             return nullptr;
         }
+
+        const auto candidates = sudoku.getCellPossibilities(bestRow, bestCol);
+        for (const auto candidate : candidates) {
+            Sudoku sudokuCopy(sudoku);
+            sudokuCopy.at(bestRow, bestCol) = candidate;
+
+            auto solution = _solve(sudokuCopy);
+            if (solution != nullptr) {
+                return solution;
+            }
+            // Not a solution, backtrack.
+        }
+
+        return nullptr;
+    }
+    bool selectNextCell(Sudoku& sudoku, int& bestRow, int& bestCol) const
+    {
+        size_t minCandidates = Sudoku::SIZE + 1;
+        bestRow = -1;
+        bestCol = -1;
+        for (int row = 0; row < Sudoku::SIZE; row++) {
+            for (int col = 0; col < Sudoku::SIZE; col++) {
+                if (sudoku.isCellFilled(row, col)) {
+                    // Cell is already filled. No further checks necessary.
+                    continue;
+                }
+                size_t numCandidates = sudoku.getCellPossibilities(row, col).size();
+                if (1 < numCandidates && numCandidates < minCandidates) {
+                    bestRow = row;
+                    bestCol = col;
+                    minCandidates = numCandidates;
+                }
+            }
+        }
+        return minCandidates <= Sudoku::SIZE;
     }
 };
 
