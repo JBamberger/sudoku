@@ -5,7 +5,7 @@
 
 add_library(sudoku_solver
         src/SudokuSolver.cpp include/SudokuSolver.h
-        )
+        src/dlx.cpp src/dlx.h src/SudokuSolverDlx.cpp src/SudokuSolverDlx.h)
 target_include_directories(sudoku_solver PUBLIC
         include
         )
@@ -18,3 +18,12 @@ target_include_directories(sudoku_solver PUBLIC
 #        )
 #target_include_directories(sudoku_solver_test PRIVATE sudoku_solver)
 #target_link_libraries(sudoku_solver_test PRIVATE sudoku_solver)
+
+
+add_executable(dlx_test
+        src/SudokuSolver.cpp include/SudokuSolver.h
+        src/dlx.cpp src/dlx.h src/SudokuSolverDlx.cpp src/SudokuSolverDlx.h
+        )
+target_include_directories(dlx_test PUBLIC
+        include
+        )
