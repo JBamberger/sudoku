@@ -92,7 +92,31 @@ main()
     auto emptyGrid = createEmptyECMatrix();
 
     DlxSolver solver;
-    solver.solve(emptyGrid);
+    auto resultRows = solver.solve(emptyGrid);
+
+    if (resultRows == nullptr) {
+        std::cerr << "Could not find any solutions to the sudoku." << std::endl;
+    } else {
+        std::array<std::array<int, 9>, 9> result{};
+        for (auto row : *resultRows) {
+            // Use leftmost node to decode position in sudoku.
+            int lmIndex = static_cast<int>(row.at(0));
+            int r = lmIndex / 9;
+            int c = lmIndex % 9;
+
+            // The next neighbor of the leftmost node encodes the row/number. -> Use it to decode the number.
+            int num = (static_cast<int>(row.at(1)) % 9) + 1;
+
+            result[r][c] = num;
+        }
+
+        for (auto row : result) {
+            for (auto value : row) {
+                std::cout << ' ' << value;
+            }
+            std::cout << std::endl;
+        }
+    }
 
     //    for (const auto& row : emptyGrid) {
     //        for (const auto& val : row) {

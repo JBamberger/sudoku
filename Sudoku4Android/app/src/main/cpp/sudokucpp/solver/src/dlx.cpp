@@ -3,6 +3,7 @@
 //
 
 #include "dlx.h"
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <utility>
@@ -99,15 +100,32 @@ struct DlxSolver::Impl
     std::vector<DataNode*> solution;
     DataNode* head = nullptr;
 
-    void solve(const std::vector<std::vector<int>>& constraintMatrix)
+    std::unique_ptr<std::vector<std::vector<size_t>>> solve(const std::vector<std::vector<int>>& constraintMatrix)
     {
 
         nodes.push_back(std::make_unique<ColumnNode>(0));
 
         encodeConstraints(constraintMatrix);
-        search(0);
+        auto result = search(0);
 
         nodes.clear();
+        solution.clear();
+        head = nullptr;
+
+        return result;
+    }
+
+    void solveAll(const std::vector<std::vector<int>>& constraintMatrix,
+                  const std::function<void(std::unique_ptr<std::vector<std::vector<size_t>>>)>& resultCollector)
+    {
+
+        nodes.push_back(std::make_unique<ColumnNode>(0));
+
+        encodeConstraints(constraintMatrix);
+        searchAll(0, resultCollector);
+
+        nodes.clear();
+        solution.clear();
         head = nullptr;
     }
 
@@ -163,44 +181,25 @@ struct DlxSolver::Impl
         }
     }
 
-    void decodeSolution()
+    std::unique_ptr<std::vector<std::vector<size_t>>> decodeSolution()
     {
-        std::cout << "###############################################" << std::endl;
-        //        for (auto node : solution) {
-        //            auto i = node;
-        //            do {
-        //                std::cout << ' ' << i->column->index;
-        //                i = i->right;
-        //            } while (i != node);
-        //            std::cout << std::endl;
-        //        }
-
-        std::array<std::array<int, 9>, 9> result{};
+        auto resultRows = std::make_unique<std::vector<std::vector<size_t>>>();
+        resultRows->reserve(solution.size());
         for (auto node : solution) {
-            // Find the leftmost node in the row. This row encodes the row/col position in the sudoku.
-            auto leftmost = node;
-            for (auto tmp = node->right; tmp != node; tmp = tmp->right) {
-                if (tmp->column->index < leftmost->column->index) {
-                    leftmost = tmp;
-                }
-            }
-            // Use leftmost node to decode position in sudoku.
-            int lmIndex = static_cast<int>(leftmost->column->index);
-            int r = lmIndex / 9;
-            int c = lmIndex % 9;
+            std::vector<size_t> ones;
 
-            // The next neighbor of the leftmost node encodes the row/number. -> Use it to decode the number.
-            int num = (static_cast<int>(leftmost->right->column->index) % 9) + 1;
+            auto i = node;
+            do {
+                ones.push_back(i->column->index);
+                i = i->right;
+            } while (i != node);
 
-            result[r][c] = num;
+            std::sort(std::begin(ones), std::end(ones));
+
+            resultRows->push_back(ones);
         }
 
-        for (auto row : result) {
-            for (auto value : row) {
-                std::cout << ' ' << value;
-            }
-            std::cout << std::endl;
-        }
+        return resultRows;
     }
 
     [[nodiscard]] ColumnNode* selectColumn() const
@@ -219,12 +218,11 @@ struct DlxSolver::Impl
 #endif
     }
 
-    void search(int k)
+    std::unique_ptr<std::vector<std::vector<size_t>>> search(int k)
     {
 
         if (head == head->right) {
-            decodeSolution();
-            return;
+            return decodeSolution();
         }
 
         auto c = selectColumn();
@@ -236,7 +234,41 @@ struct DlxSolver::Impl
             for (auto j = r->right; j != r; j = j->right) {
                 j->column->cover();
             }
-            search(k + 1);
+
+            auto result = search(k + 1);
+            if (result != nullptr) {
+                return result;
+            }
+
+            r = solution.back();
+            solution.pop_back();
+            c = r->column;
+
+            for (auto j = r->left; j != r; j = j->left) {
+                j->column->uncover();
+            }
+        }
+        c->uncover();
+
+        return nullptr;
+    }
+
+    void searchAll(int k, const std::function<void(std::unique_ptr<std::vector<std::vector<size_t>>>)>& resultCollector)
+    {
+        if (head == head->right) {
+            resultCollector(decodeSolution());
+        }
+
+        auto c = selectColumn();
+        c->cover();
+
+        for (auto r = c->down; r != c; r = r->down) {
+            solution.push_back(r);
+
+            for (auto j = r->right; j != r; j = j->right) {
+                j->column->cover();
+            }
+            searchAll(k + 1, resultCollector);
 
             r = solution.back();
             solution.pop_back();
@@ -256,8 +288,14 @@ DlxSolver::~DlxSolver() = default;
 DlxSolver::DlxSolver(DlxSolver&&) noexcept = default;
 DlxSolver&
 DlxSolver::operator=(DlxSolver&&) noexcept = default;
-void
+std::unique_ptr<std::vector<std::vector<size_t>>>
 DlxSolver::solve(const std::vector<std::vector<int>>& constraintMatrix)
 {
-    impl->solve(constraintMatrix);
+    return impl->solve(constraintMatrix);
+}
+void
+DlxSolver::solve(const std::vector<std::vector<int>>& constraintMatrix,
+                 const std::function<void(std::unique_ptr<std::vector<std::vector<size_t>>>)>& resultCollector)
+{
+    impl->solveAll(constraintMatrix, resultCollector);
 }
