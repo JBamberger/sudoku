@@ -8,8 +8,8 @@
 #include "dlx.h"
 #include <vector>
 
-static int sudokuSide = 9;
-static int boxSide = 3;
+static size_t sudokuSide = 9;
+static size_t boxSide = 3;
 
 /**
  * Computes the exact cover matrix row referred to by the given sudoku coordinates.
@@ -29,7 +29,7 @@ getRowIndex(size_t row, size_t col, int num)
  * @return
  */
 std::vector<std::vector<int>>
-sudokuExactCover()
+createEmptyECMatrix()
 {
     size_t rows = 9 * 9 * 9; // sudoku_rows * sudoku_cols * sudoku_nums
     size_t cols = 9 * 9 * 4; // sudoku_rows * sudoku_nums for each constraint type
@@ -89,7 +89,7 @@ sudokuExactCover()
 int
 main()
 {
-    auto emptyGrid = sudokuExactCover();
+    auto emptyGrid = createEmptyECMatrix();
 
     DlxSolver solver;
     solver.solve(emptyGrid);

@@ -7,6 +7,7 @@
 #include <string>
 #include <utility>
 
+#include <array>
 #include <iostream>
 
 struct ColumnNode;
@@ -165,12 +166,39 @@ struct DlxSolver::Impl
     void decodeSolution()
     {
         std::cout << "###############################################" << std::endl;
+        //        for (auto node : solution) {
+        //            auto i = node;
+        //            do {
+        //                std::cout << ' ' << i->column->index;
+        //                i = i->right;
+        //            } while (i != node);
+        //            std::cout << std::endl;
+        //        }
+
+        std::array<std::array<int, 9>, 9> result{};
         for (auto node : solution) {
-            auto i = node;
-            do {
-                std::cout << ' ' << i->column->index;
-                i = i->right;
-            } while (i != node);
+            // Find the leftmost node in the row. This row encodes the row/col position in the sudoku.
+            auto leftmost = node;
+            for (auto tmp = node->right; tmp != node; tmp = tmp->right) {
+                if (tmp->column->index < leftmost->column->index) {
+                    leftmost = tmp;
+                }
+            }
+            // Use leftmost node to decode position in sudoku.
+            int lmIndex = static_cast<int>(leftmost->column->index);
+            int r = lmIndex / 9;
+            int c = lmIndex % 9;
+
+            // The next neighbor of the leftmost node encodes the row/number. -> Use it to decode the number.
+            int num = (static_cast<int>(leftmost->right->column->index) % 9) + 1;
+
+            result[r][c] = num;
+        }
+
+        for (auto row : result) {
+            for (auto value : row) {
+                std::cout << ' ' << value;
+            }
             std::cout << std::endl;
         }
     }
