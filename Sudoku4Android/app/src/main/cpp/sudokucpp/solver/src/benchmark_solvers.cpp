@@ -117,17 +117,17 @@ evalConfig(SolverType type, const std::string& file)
 int
 main()
 {
-    evalConfig(SolverType::Dlx, "./solver/tests/test_sudokus.txt");
-    evalConfig(SolverType::Dlx, "./solver/tests/any.txt");
-    evalConfig(SolverType::Dlx, "./solver/tests/simple.txt");
-    evalConfig(SolverType::Dlx, "./solver/tests/easy.txt");
-    evalConfig(SolverType::Dlx, "./solver/tests/intermediate.txt");
-    evalConfig(SolverType::Dlx, "./solver/tests/expert.txt");
-
     evalConfig(SolverType::Constraint, "./solver/tests/test_sudokus.txt");
     evalConfig(SolverType::Constraint, "./solver/tests/any.txt");
     evalConfig(SolverType::Constraint, "./solver/tests/simple.txt");
     evalConfig(SolverType::Constraint, "./solver/tests/easy.txt");
     evalConfig(SolverType::Constraint, "./solver/tests/intermediate.txt");
     evalConfig(SolverType::Constraint, "./solver/tests/expert.txt");
+
+    evalConfig(SolverType::Dlx, "./solver/tests/test_sudokus.txt");
+    evalConfig(SolverType::Dlx, "./solver/tests/any.txt");
+    evalConfig(SolverType::Dlx, "./solver/tests/simple.txt");
+    evalConfig(SolverType::Dlx, "./solver/tests/easy.txt");
+    evalConfig(SolverType::Dlx, "./solver/tests/intermediate.txt");
+    evalConfig(SolverType::Dlx, "./solver/tests/expert.txt");
 }

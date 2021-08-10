@@ -191,14 +191,14 @@ getRowIndex(size_t row, size_t col, int num)
  * Creates a matrix representing the exact cover problem of an empty sudoku.
  * @return
  */
-std::vector<std::vector<size_t>>
+DlxConstraintMatrix
 createEmptyECMatrix()
 {
     size_t rows = 9 * 9 * 9; // sudoku_rows * sudoku_cols * sudoku_nums
     size_t cols = 9 * 9 * 4; // sudoku_rows * sudoku_nums for each constraint type
 
     // zero-initializes the matrix of size [rows, cols]
-    std::vector<std::vector<size_t>> matrix(rows);
+    DlxConstraintMatrix matrix(rows, cols);
 
     size_t nextColumn = 0;
 
@@ -206,7 +206,7 @@ createEmptyECMatrix()
     for (size_t row = 1; row <= sudokuSide; row++) {
         for (size_t col = 1; col <= sudokuSide; col++) {
             for (int num = 1; num <= sudokuSide; num++) {
-                matrix[getRowIndex(row, col, num)].push_back(nextColumn);
+                matrix.constraints[getRowIndex(row, col, num)].push_back(nextColumn);
             }
             nextColumn++;
         }
@@ -216,7 +216,7 @@ createEmptyECMatrix()
     for (size_t row = 1; row <= sudokuSide; row++) {
         for (int num = 1; num <= sudokuSide; num++) {
             for (size_t col = 1; col <= sudokuSide; col++) {
-                matrix[getRowIndex(row, col, num)].push_back(nextColumn);
+                matrix.constraints[getRowIndex(row, col, num)].push_back(nextColumn);
             }
             nextColumn++;
         }
@@ -226,7 +226,7 @@ createEmptyECMatrix()
     for (size_t col = 1; col <= sudokuSide; col++) {
         for (int num = 1; num <= sudokuSide; num++) {
             for (size_t row = 1; row <= sudokuSide; row++) {
-                matrix[getRowIndex(row, col, num)].push_back(nextColumn);
+                matrix.constraints[getRowIndex(row, col, num)].push_back(nextColumn);
             }
             nextColumn++;
         }
@@ -238,7 +238,8 @@ createEmptyECMatrix()
             for (int num = 1; num <= sudokuSide; num++) {
                 for (size_t rowDelta = 0; rowDelta < boxSide; rowDelta++) {
                     for (size_t colDelta = 0; colDelta < boxSide; colDelta++) {
-                        matrix[getRowIndex(boxRow + rowDelta, boxCol + colDelta, num)].push_back(nextColumn);
+                        matrix.constraints[getRowIndex(boxRow + rowDelta, boxCol + colDelta, num)].push_back(
+                          nextColumn);
                     }
                 }
                 nextColumn++;
@@ -255,10 +256,10 @@ atGrid(const SudokuGrid& grid, size_t row, size_t col)
     return grid[row * sudokuSide + col];
 }
 
-std::vector<std::vector<size_t>>
+DlxConstraintMatrix
 createSudokuECMatrix(SudokuGrid sudoku)
 {
-    std::vector<std::vector<size_t>> matrix = createEmptyECMatrix();
+    DlxConstraintMatrix matrix = createEmptyECMatrix();
     for (size_t i = 1; i <= sudokuSide; i++) {
         for (size_t j = 1; j <= sudokuSide; j++) {
             int sudokuNum = atGrid(sudoku, i - 1, j - 1);
@@ -270,7 +271,7 @@ createSudokuECMatrix(SudokuGrid sudoku)
             // zero out in the constraint board
             for (int num = 1; num <= sudokuSide; num++) {
                 if (num != sudokuNum) {
-                    auto& row = matrix[getRowIndex(i, j, num)];
+                    auto& row = matrix.constraints[getRowIndex(i, j, num)];
                     row.clear();
                 }
             }
@@ -300,7 +301,7 @@ SudokuDlxSolver::solve(const SudokuGrid& sudoku) const
     }
 
     auto solution = std::make_unique<SudokuGrid>();
-    for (auto row : *resultRows) {
+    for (auto row : resultRows->constraints) {
         // Use leftmost node to decode position in sudoku.
         int lmIndex = static_cast<int>(row.at(0));
         int r = lmIndex / 9;
@@ -327,25 +328,25 @@ SudokuSolver::create(SolverType type)
     }
 }
 
-//int
-//main()
+// int
+// main()
 //{
-//    std::string sudokuString = "4.....8.5.3..........7......2.....6.....8.4......1.......6.3.7.5..2.....1.4......";
-//    SudokuGrid grid{};
-//    for (int i = 0; i < 81; i++) {
-//        char cellValue = sudokuString.at(i);
-//        grid[i] = cellValue == '.' ? 0 : cellValue - '0';
-//    }
+//     std::string sudokuString = "4.....8.5.3..........7......2.....6.....8.4......1.......6.3.7.5..2.....1.4......";
+//     SudokuGrid grid{};
+//     for (int i = 0; i < 81; i++) {
+//         char cellValue = sudokuString.at(i);
+//         grid[i] = cellValue == '.' ? 0 : cellValue - '0';
+//     }
 //
-//    auto solver = SudokuSolver::create(SolverType::Dlx);
-//    auto solution = solver->solve(grid);
+//     auto solver = SudokuSolver::create(SolverType::Dlx);
+//     auto solution = solver->solve(grid);
 //
-//    if (solution == nullptr) {
-//        std::cerr << "Could not find any solutions to the sudoku." << std::endl;
-//    } else {
-//        for (int i = 0; i < 81; i++) {
-//            std::cout << (*solution)[i];
-//        }
-//        std::cout << std::endl;
-//    }
-//}
+//     if (solution == nullptr) {
+//         std::cerr << "Could not find any solutions to the sudoku." << std::endl;
+//     } else {
+//         for (int i = 0; i < 81; i++) {
+//             std::cout << (*solution)[i];
+//         }
+//         std::cout << std::endl;
+//     }
+// }

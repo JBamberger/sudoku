@@ -9,6 +9,17 @@
 #include <memory>
 #include <vector>
 
+struct DlxConstraintMatrix
+{
+    size_t numCols;
+    std::vector<std::vector<size_t>> constraints;
+
+    DlxConstraintMatrix(size_t numRows, size_t numCols)
+      : numCols(numCols)
+      , constraints(numRows)
+    {}
+};
+
 class DlxSolver
 {
     struct Impl;
@@ -22,9 +33,9 @@ class DlxSolver
     DlxSolver& operator=(DlxSolver&&) noexcept;
     DlxSolver& operator=(const DlxSolver&) = delete;
 
-    void solve(const std::vector<std::vector<size_t>>& constraintMatrix,
-               const std::function<void(std::unique_ptr<std::vector<std::vector<size_t>>>)>& resultCollector);
-    std::unique_ptr<std::vector<std::vector<size_t>>> solve(const std::vector<std::vector<size_t>>& constraintMatrix);
+    void solve(const DlxConstraintMatrix& constraintMatrix,
+               const std::function<void(std::unique_ptr<DlxConstraintMatrix>)>& resultCollector);
+    std::unique_ptr<DlxConstraintMatrix> solve(const DlxConstraintMatrix& constraintMatrix);
 };
 
 #endif // DLX_H
