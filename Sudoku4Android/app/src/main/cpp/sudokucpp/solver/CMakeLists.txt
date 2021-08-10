@@ -28,3 +28,7 @@ add_executable(dlx_test
 target_include_directories(dlx_test PUBLIC
         include
         )
+
+add_executable(benchmark_solvers src/benchmark_solvers.cpp)
+target_link_libraries(benchmark_solvers PUBLIC sudoku_solver)
+target_include_directories(benchmark_solvers PUBLIC include)
