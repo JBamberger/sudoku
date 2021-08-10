@@ -14,15 +14,6 @@ find_package(OpenCV 4.5 REQUIRED java core imgcodecs imgproc highgui videoio dnn
 add_subdirectory(sudokucpp)
 find_library(log-lib log)
 
-add_library(native-lib SHARED
-        native-lib.cpp
-        )
-target_link_libraries(native-lib
-        ${log-lib}
-        ${OpenCV_LIBRARIES}
-        )
-
-
 add_library(mixed_sample SHARED
         jni_part.cpp
         )
