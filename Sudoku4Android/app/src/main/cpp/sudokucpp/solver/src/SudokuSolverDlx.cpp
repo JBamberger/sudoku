@@ -7,6 +7,7 @@
 #include "SudokuSolver.h"
 #include "dlx.h"
 #include <vector>
+#include <fstream>
 
 static size_t sudokuSide = 9;
 static size_t boxSide = 3;
@@ -87,17 +88,76 @@ createEmptyECMatrix()
 }
 
 int
+atGrid(const SudokuGrid& grid, size_t row, size_t col)
+{
+    return grid[row * sudokuSide + col];
+}
+
+std::vector<std::vector<int>>
+createSudokuECMatrix(SudokuGrid sudoku)
+{
+    std::vector<std::vector<int>> matrix = createEmptyECMatrix();
+    for (size_t i = 1; i <= sudokuSide; i++) {
+        for (size_t j = 1; j <= sudokuSide; j++) {
+            int sudokuNum = atGrid(sudoku, i - 1, j - 1);
+
+            if (sudokuNum == 0) {
+                continue;
+            }
+
+            // zero out in the constraint board
+            for (int num = 1; num <= sudokuSide; num++) {
+                if (num != sudokuNum) {
+                    auto& row = matrix[getRowIndex(i, j, num)];
+                    std::fill(std::begin(row), std::end(row), 0);
+                }
+            }
+        }
+    }
+    return matrix;
+}
+
+int
 main()
 {
+
+    std::string sudokuString = "4.....8.5.3..........7......2.....6.....8.4......1.......6.3.7.5..2.....1.4......";
+    SudokuGrid grid{};
+    for (int i = 0; i < 81; i++) {
+        char cellValue = sudokuString.at(i);
+        grid[i] = cellValue == '.' ? 0 : cellValue - '0';
+    }
     auto emptyGrid = createEmptyECMatrix();
+    auto sudokuGrid = createSudokuECMatrix(grid);
+
+
+    std::ofstream emptyGridFile("emptyGrid.txt");
+    for (const auto& row : emptyGrid) {
+        for (auto value : row) {
+            emptyGridFile << ' ' << value;
+        }
+        emptyGridFile << std::endl;
+    }
+    emptyGridFile.close();
+
+    std::ofstream sudokuGridFile("sudokuGrid.txt");
+    for (const auto& row : sudokuGrid) {
+        for (auto value : row) {
+            sudokuGridFile << ' ' << value;
+        }
+        sudokuGridFile << std::endl;
+    }
+    sudokuGridFile.close();
+
 
     DlxSolver solver;
-    auto resultRows = solver.solve(emptyGrid);
+    auto resultRows = solver.solve(sudokuGrid);
 
     if (resultRows == nullptr) {
         std::cerr << "Could not find any solutions to the sudoku." << std::endl;
     } else {
         std::array<std::array<int, 9>, 9> result{};
+        SudokuGrid solution{};
         for (auto row : *resultRows) {
             // Use leftmost node to decode position in sudoku.
             int lmIndex = static_cast<int>(row.at(0));
@@ -108,6 +168,10 @@ main()
             int num = (static_cast<int>(row.at(1)) % 9) + 1;
 
             result[r][c] = num;
+
+            auto coord = r * sudokuSide + c;
+            std::cout << coord << std::endl;
+            solution[coord] = num;
         }
 
         for (auto row : result) {
@@ -116,12 +180,10 @@ main()
             }
             std::cout << std::endl;
         }
-    }
 
-    //    for (const auto& row : emptyGrid) {
-    //        for (const auto& val : row) {
-    //            std::cout << ' ' << val;
-    //        }
-    //        std::cout << std::endl;
-    //    }
+        for (int i = 0; i < 81; i++) {
+            std::cout << solution[i] ;
+        }
+        std::cout << std::endl;
+    }
 }
