@@ -4,8 +4,9 @@
 #set(CMAKE_CXX_STANDARD 17)
 
 add_library(sudoku_solver
+        src/dlx.cpp src/dlx.h
         src/SudokuSolver.cpp include/SudokuSolver.h
-        src/dlx.cpp src/dlx.h src/SudokuSolverDlx.cpp src/SudokuSolverDlx.h)
+        )
 target_include_directories(sudoku_solver PUBLIC
         include
         )
@@ -21,8 +22,8 @@ target_include_directories(sudoku_solver PUBLIC
 
 
 add_executable(dlx_test
+        src/dlx.cpp src/dlx.h
         src/SudokuSolver.cpp include/SudokuSolver.h
-        src/dlx.cpp src/dlx.h src/SudokuSolverDlx.cpp src/SudokuSolverDlx.h
         )
 target_include_directories(dlx_test PUBLIC
         include

@@ -1,10 +1,10 @@
 #include "gtest/gtest.h"
 
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
-#include <filesystem>
 
 #include <SudokuSolver.h>
 
@@ -23,7 +23,7 @@ TEST(solver, test1)
         exit(EXIT_FAILURE);
     }
 
-    SudokuSolver solver;
+    auto solver = SudokuSolver::create(SolverType::Dlx);
 
     while (std::getline(sudokuListFile, line)) {
         //        std::cout << line << std::endl;
@@ -40,7 +40,7 @@ TEST(solver, test1)
             solution[i] = cellValue - '0';
         }
 
-        auto result = solver.solve(grid);
+        auto result = solver->solve(grid);
         //        std::cout << (result == nullptr ? "Not Solved" : "solved") << std::endl;
 
         EXPECT_NE(result, nullptr);

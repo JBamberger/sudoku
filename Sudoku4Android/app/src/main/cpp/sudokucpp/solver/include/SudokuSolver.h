@@ -8,21 +8,34 @@
 
 using SudokuGrid = std::array<int, 81>;
 
+enum class SolverType
+{
+    /**
+     * This solver uses a backtracking algorithm to solve Sudokus. To improve the performance some simple heuristics
+     * and the simplifying of a small set of known situations is used.
+     */
+    Constraint,
+    /**
+     * This algorithm is based on Knuth's Algorithm X with the 'Dancing Links' implementation.
+     */
+    Dlx
+};
+
+/**
+ * Interface for a ConstraintSolverSudoku solving algorithm.
+ */
 class SudokuSolver
 {
-    template<int gridSize>
-    struct Impl;
-    std::unique_ptr<Impl<9>> pimpl;
-
   public:
-    explicit SudokuSolver();
-    ~SudokuSolver();
-    SudokuSolver(SudokuSolver&&) noexcept;
-    SudokuSolver(const SudokuSolver&) = delete;
-    SudokuSolver& operator=(SudokuSolver&&) noexcept;
-    SudokuSolver& operator=(const SudokuSolver&) = delete;
+    virtual ~SudokuSolver() = default;
+    /**
+     * Solves the given sudoku grid.
+     * @param sudoku input sudoku grid
+     * @return Pointer to the solution or nullptr if there is no solution to the grid.
+     */
+    [[nodiscard]] virtual std::unique_ptr<SudokuGrid> solve(const SudokuGrid& sudoku) const = 0;
 
-    std::unique_ptr<SudokuGrid> solve(const SudokuGrid& sudoku) const;
+    static std::unique_ptr<SudokuSolver> create(SolverType type = SolverType::Dlx);
 };
 
 inline void

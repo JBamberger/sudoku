@@ -1,16 +1,18 @@
+//
+// Created by jannik on 08.08.2021.
+//
+
 #include "SudokuSolver.h"
+#include "dlx.h"
 
 #include <algorithm>
-#include <assert.h>
-#include <iomanip>
+#include <cassert>
 #include <iostream>
 #include <numeric>
-#include <set>
-#include <string>
+#include <stdexcept>
 #include <vector>
-// template<int GRID_SIZE>
 
-enum class SolveState
+enum class ConstraintSolverState
 {
     SOLVED,
     UNMODIFIED,
@@ -18,16 +20,13 @@ enum class SolveState
     UNSOLVABLE
 };
 
-struct Sudoku
+struct ConstraintSolverSudoku
 {
-    //    static_assert(GRID_SIZE == 9, "At the moment only grid_size == 9 is supported");
-
     static constexpr int BOX_SIZE = 3;
     static constexpr int SIZE = 9;
     static constexpr int NUM_CELLS = 81;
 
     SudokuGrid grid;
-    //    std::array<std::set<int>, NUM_CELLS> candidates;
 
     static int from2d(int row, int col) { return row * SIZE + col; }
 
@@ -36,7 +35,7 @@ struct Sudoku
         return std::make_tuple(row / BOX_SIZE, col / BOX_SIZE);
     }
 
-    explicit Sudoku(const SudokuGrid& grid)
+    explicit ConstraintSolverSudoku(const SudokuGrid& grid)
       : grid(grid)
     {}
 
@@ -77,7 +76,7 @@ struct Sudoku
         return numbers;
     }
 
-    SolveState solveTrivial()
+    ConstraintSolverState solveTrivial()
     {
         bool solved = true;
         for (int row = 0; row < SIZE; row++) {
@@ -91,48 +90,29 @@ struct Sudoku
 
                 if (candidates.size() == 1) {
                     grid[from2d(row, col)] = candidates.front();
-                    return SolveState::MODIFIED;
+                    return ConstraintSolverState::MODIFIED;
                 } else if (candidates.empty()) {
-                    return SolveState::UNSOLVABLE;
+                    return ConstraintSolverState::UNSOLVABLE;
                 }
             }
         }
 
-        return solved ? SolveState::SOLVED : SolveState::UNMODIFIED;
+        return solved ? ConstraintSolverState::SOLVED : ConstraintSolverState::UNMODIFIED;
     }
 };
 
-template<int GRID_SIZE>
-struct SudokuSolver::Impl
+class SudokuConstraintSolver : public SudokuSolver
 {
-    std::unique_ptr<SudokuGrid> solve(const SudokuGrid& sudokuGrid)
+    std::unique_ptr<SudokuGrid> _solve(ConstraintSolverSudoku& sudoku) const
     {
-        Sudoku sudoku(sudokuGrid);
-        return _solve(sudoku);
-    }
-    std::unique_ptr<SudokuGrid> _solve(Sudoku& sudoku)
-    {
-//        std::vector<Sudoku> stack;
-//        stack.push_back(sudoku);
-//
-//        while (!stack.empty()) {
-//            // solve trivial
-//            // select cell
-//            // compute candidates
-//            // for each candidate:
-//            //  create copy and try candidate
-//            //  on success return
-//            //  on error backtrack
-//        }
-
         while (true) {
-            SolveState solveResult = sudoku.solveTrivial();
-            if (solveResult == SolveState::UNMODIFIED) {
+            ConstraintSolverState solveResult = sudoku.solveTrivial();
+            if (solveResult == ConstraintSolverState::UNMODIFIED) {
                 // Not changed, need to try a cell value and backtrack if erroneous
                 break;
-            } else if (solveResult == SolveState::SOLVED) {
+            } else if (solveResult == ConstraintSolverState::SOLVED) {
                 return std::make_unique<SudokuGrid>(sudoku.grid);
-            } else if (solveResult == SolveState::UNSOLVABLE) {
+            } else if (solveResult == ConstraintSolverState::UNSOLVABLE) {
                 return nullptr;
             }
         }
@@ -146,7 +126,7 @@ struct SudokuSolver::Impl
 
         const auto candidates = sudoku.getCellPossibilities(bestRow, bestCol);
         for (const auto candidate : candidates) {
-            Sudoku sudokuCopy(sudoku);
+            ConstraintSolverSudoku sudokuCopy(sudoku);
             sudokuCopy.at(bestRow, bestCol) = candidate;
 
             auto solution = _solve(sudokuCopy);
@@ -158,13 +138,14 @@ struct SudokuSolver::Impl
 
         return nullptr;
     }
-    bool selectNextCell(Sudoku& sudoku, int& bestRow, int& bestCol) const
+
+    static bool selectNextCell(ConstraintSolverSudoku& sudoku, int& bestRow, int& bestCol)
     {
-        size_t minCandidates = Sudoku::SIZE + 1;
+        size_t minCandidates = ConstraintSolverSudoku::SIZE + 1;
         bestRow = -1;
         bestCol = -1;
-        for (int row = 0; row < Sudoku::SIZE; row++) {
-            for (int col = 0; col < Sudoku::SIZE; col++) {
+        for (int row = 0; row < ConstraintSolverSudoku::SIZE; row++) {
+            for (int col = 0; col < ConstraintSolverSudoku::SIZE; col++) {
                 if (sudoku.isCellFilled(row, col)) {
                     // Cell is already filled. No further checks necessary.
                     continue;
@@ -177,27 +158,194 @@ struct SudokuSolver::Impl
                 }
             }
         }
-        return minCandidates <= Sudoku::SIZE;
+        return minCandidates <= ConstraintSolverSudoku::SIZE;
+    }
+
+  public:
+    ~SudokuConstraintSolver() override = default;
+
+    [[nodiscard]] std::unique_ptr<SudokuGrid> solve(const SudokuGrid& sudokuGrid) const override
+    {
+        ConstraintSolverSudoku sudoku(sudokuGrid);
+        return _solve(sudoku);
     }
 };
 
-SudokuSolver::SudokuSolver()
-  : pimpl{ std::make_unique<Impl<9>>() }
-{}
-SudokuSolver&
-SudokuSolver::operator=(SudokuSolver&&) noexcept = default;
-SudokuSolver::SudokuSolver(SudokuSolver&&) noexcept = default;
-SudokuSolver::~SudokuSolver() = default;
+static size_t sudokuSide = 9;
+static size_t boxSide = 3;
+
+/**
+ * Computes the exact cover matrix row referred to by the given sudoku coordinates.
+ * @param row 1-based row in the sudoku
+ * @param col 1-based column in the sudoku
+ * @param num number in the sudoku
+ * @return 0-based row index in the exact cover matrix.
+ */
+size_t
+getRowIndex(size_t row, size_t col, int num)
+{
+    return (row - 1) * sudokuSide * sudokuSide + (col - 1) * sudokuSide + (num - 1);
+}
+
+/**
+ * Creates a matrix representing the exact cover problem of an empty sudoku.
+ * @return
+ */
+std::vector<std::vector<int>>
+createEmptyECMatrix()
+{
+    size_t rows = 9 * 9 * 9; // sudoku_rows * sudoku_cols * sudoku_nums
+    size_t cols = 9 * 9 * 4; // sudoku_rows * sudoku_nums for each constraint type
+
+    // zero-initializes the matrix of size [rows, cols]
+    std::vector<std::vector<int>> matrix(rows, std::vector<int>(cols));
+
+    size_t nextColumn = 0;
+
+    // Each row in the matrix refers to a specific number in a specific position. This is encoded by the first block.
+    for (size_t row = 1; row <= sudokuSide; row++) {
+        for (size_t col = 1; col <= sudokuSide; col++) {
+            for (int num = 1; num <= sudokuSide; num++) {
+                matrix[getRowIndex(row, col, num)][nextColumn] = 1;
+            }
+            nextColumn++;
+        }
+    }
+
+    // Constraints to ensure that each number only occurs once per row
+    for (size_t row = 1; row <= sudokuSide; row++) {
+        for (int num = 1; num <= sudokuSide; num++) {
+            for (size_t col = 1; col <= sudokuSide; col++) {
+                matrix[getRowIndex(row, col, num)][nextColumn] = 1;
+            }
+            nextColumn++;
+        }
+    }
+
+    // Constraints to ensure that each number only occurs once per column
+    for (size_t col = 1; col <= sudokuSide; col++) {
+        for (int num = 1; num <= sudokuSide; num++) {
+            for (size_t row = 1; row <= sudokuSide; row++) {
+                matrix[getRowIndex(row, col, num)][nextColumn] = 1;
+            }
+            nextColumn++;
+        }
+    }
+
+    // Constraints to ensure that each number only occurs once per block
+    for (size_t boxRow = 1; boxRow <= sudokuSide; boxRow += boxSide) {
+        for (size_t boxCol = 1; boxCol <= sudokuSide; boxCol += boxSide) {
+            for (int num = 1; num <= sudokuSide; num++) {
+                for (size_t rowDelta = 0; rowDelta < boxSide; rowDelta++) {
+                    for (size_t colDelta = 0; colDelta < boxSide; colDelta++) {
+                        matrix[getRowIndex(boxRow + rowDelta, boxCol + colDelta, num)][nextColumn] = 1;
+                    }
+                }
+                nextColumn++;
+            }
+        }
+    }
+
+    return matrix;
+}
+
+int
+atGrid(const SudokuGrid& grid, size_t row, size_t col)
+{
+    return grid[row * sudokuSide + col];
+}
+
+std::vector<std::vector<int>>
+createSudokuECMatrix(SudokuGrid sudoku)
+{
+    std::vector<std::vector<int>> matrix = createEmptyECMatrix();
+    for (size_t i = 1; i <= sudokuSide; i++) {
+        for (size_t j = 1; j <= sudokuSide; j++) {
+            int sudokuNum = atGrid(sudoku, i - 1, j - 1);
+
+            if (sudokuNum == 0) {
+                continue;
+            }
+
+            // zero out in the constraint board
+            for (int num = 1; num <= sudokuSide; num++) {
+                if (num != sudokuNum) {
+                    auto& row = matrix[getRowIndex(i, j, num)];
+                    std::fill(std::begin(row), std::end(row), 0);
+                }
+            }
+        }
+    }
+    return matrix;
+}
+
+class SudokuDlxSolver : public SudokuSolver
+{
+  public:
+    ~SudokuDlxSolver() override = default;
+
+    [[nodiscard]] std::unique_ptr<SudokuGrid> solve(const SudokuGrid& sudoku) const override;
+};
 
 std::unique_ptr<SudokuGrid>
-SudokuSolver::solve(const SudokuGrid& sudoku) const
+SudokuDlxSolver::solve(const SudokuGrid& sudoku) const
 {
-    //    const auto& msg = pimpl->hasConstraintViolations(sudoku);
+    auto sudokuGrid = createSudokuECMatrix(sudoku);
 
-    //    if (msg == nullptr) {
-    //        return nullptr;
-    //    }
-    //
-    //    pimpl->solveTrivialCells(sudoku);
-    return pimpl->solve(sudoku);
+    DlxSolver solver;
+    auto resultRows = solver.solve(sudokuGrid);
+
+    if (resultRows == nullptr) {
+        return nullptr;
+    }
+
+    auto solution = std::make_unique<SudokuGrid>();
+    for (auto row : *resultRows) {
+        // Use leftmost node to decode position in sudoku.
+        int lmIndex = static_cast<int>(row.at(0));
+        int r = lmIndex / 9;
+        int c = lmIndex % 9;
+
+        // The next neighbor of the leftmost node encodes the row/number. -> Use it to decode the number.
+        int num = (static_cast<int>(row.at(1)) % 9) + 1;
+
+        (*solution)[r * sudokuSide + c] = num;
+    }
+    return solution;
 }
+
+std::unique_ptr<SudokuSolver>
+SudokuSolver::create(SolverType type)
+{
+    switch (type) {
+        case SolverType::Constraint:
+            return std::make_unique<SudokuConstraintSolver>();
+        case SolverType::Dlx:
+            return std::make_unique<SudokuDlxSolver>();
+        default:
+            throw std::runtime_error("Invalid solver type.");
+    }
+}
+
+//int
+//main()
+//{
+//    std::string sudokuString = "4.....8.5.3..........7......2.....6.....8.4......1.......6.3.7.5..2.....1.4......";
+//    SudokuGrid grid{};
+//    for (int i = 0; i < 81; i++) {
+//        char cellValue = sudokuString.at(i);
+//        grid[i] = cellValue == '.' ? 0 : cellValue - '0';
+//    }
+//
+//    auto solver = SudokuSolver::create(SolverType::Dlx);
+//    auto solution = solver->solve(grid);
+//
+//    if (solution == nullptr) {
+//        std::cerr << "Could not find any solutions to the sudoku." << std::endl;
+//    } else {
+//        for (int i = 0; i < 81; i++) {
+//            std::cout << (*solution)[i];
+//        }
+//        std::cout << std::endl;
+//    }
+//}
