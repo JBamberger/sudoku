@@ -41,9 +41,9 @@ struct SudokuDetector::Impl
           std::all_of(std::begin(detection->cellLabels), std::end(detection->cellLabels), [](int i) { return i >= 0; });
 
         if (detection->foundAllCells) {
-            SudokuSolver solver;
+            auto solver = SudokuSolver::create(SolverType::Dlx);
 
-            detection->solution = solver.solve(detection->cellLabels);
+            detection->solution = solver->solve(detection->cellLabels);
         }
 
         //        cv::Mat canvas = warped.clone();
