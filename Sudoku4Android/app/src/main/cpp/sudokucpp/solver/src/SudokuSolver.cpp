@@ -191,14 +191,14 @@ getRowIndex(size_t row, size_t col, int num)
  * Creates a matrix representing the exact cover problem of an empty sudoku.
  * @return
  */
-std::vector<std::vector<int>>
+std::vector<std::vector<size_t>>
 createEmptyECMatrix()
 {
     size_t rows = 9 * 9 * 9; // sudoku_rows * sudoku_cols * sudoku_nums
     size_t cols = 9 * 9 * 4; // sudoku_rows * sudoku_nums for each constraint type
 
     // zero-initializes the matrix of size [rows, cols]
-    std::vector<std::vector<int>> matrix(rows, std::vector<int>(cols));
+    std::vector<std::vector<size_t>> matrix(rows);
 
     size_t nextColumn = 0;
 
@@ -206,7 +206,7 @@ createEmptyECMatrix()
     for (size_t row = 1; row <= sudokuSide; row++) {
         for (size_t col = 1; col <= sudokuSide; col++) {
             for (int num = 1; num <= sudokuSide; num++) {
-                matrix[getRowIndex(row, col, num)][nextColumn] = 1;
+                matrix[getRowIndex(row, col, num)].push_back(nextColumn);
             }
             nextColumn++;
         }
@@ -216,7 +216,7 @@ createEmptyECMatrix()
     for (size_t row = 1; row <= sudokuSide; row++) {
         for (int num = 1; num <= sudokuSide; num++) {
             for (size_t col = 1; col <= sudokuSide; col++) {
-                matrix[getRowIndex(row, col, num)][nextColumn] = 1;
+                matrix[getRowIndex(row, col, num)].push_back(nextColumn);
             }
             nextColumn++;
         }
@@ -226,7 +226,7 @@ createEmptyECMatrix()
     for (size_t col = 1; col <= sudokuSide; col++) {
         for (int num = 1; num <= sudokuSide; num++) {
             for (size_t row = 1; row <= sudokuSide; row++) {
-                matrix[getRowIndex(row, col, num)][nextColumn] = 1;
+                matrix[getRowIndex(row, col, num)].push_back(nextColumn);
             }
             nextColumn++;
         }
@@ -238,7 +238,7 @@ createEmptyECMatrix()
             for (int num = 1; num <= sudokuSide; num++) {
                 for (size_t rowDelta = 0; rowDelta < boxSide; rowDelta++) {
                     for (size_t colDelta = 0; colDelta < boxSide; colDelta++) {
-                        matrix[getRowIndex(boxRow + rowDelta, boxCol + colDelta, num)][nextColumn] = 1;
+                        matrix[getRowIndex(boxRow + rowDelta, boxCol + colDelta, num)].push_back(nextColumn);
                     }
                 }
                 nextColumn++;
@@ -255,10 +255,10 @@ atGrid(const SudokuGrid& grid, size_t row, size_t col)
     return grid[row * sudokuSide + col];
 }
 
-std::vector<std::vector<int>>
+std::vector<std::vector<size_t>>
 createSudokuECMatrix(SudokuGrid sudoku)
 {
-    std::vector<std::vector<int>> matrix = createEmptyECMatrix();
+    std::vector<std::vector<size_t>> matrix = createEmptyECMatrix();
     for (size_t i = 1; i <= sudokuSide; i++) {
         for (size_t j = 1; j <= sudokuSide; j++) {
             int sudokuNum = atGrid(sudoku, i - 1, j - 1);
@@ -271,7 +271,7 @@ createSudokuECMatrix(SudokuGrid sudoku)
             for (int num = 1; num <= sudokuSide; num++) {
                 if (num != sudokuNum) {
                     auto& row = matrix[getRowIndex(i, j, num)];
-                    std::fill(std::begin(row), std::end(row), 0);
+                    row.clear();
                 }
             }
         }

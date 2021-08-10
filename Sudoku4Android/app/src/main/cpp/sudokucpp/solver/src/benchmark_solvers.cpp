@@ -3,13 +3,13 @@
 //
 
 #include <SudokuSolver.h>
+#include <chrono>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <sstream>
-#include <ctime>
 #include <ratio>
-#include <chrono>
+#include <sstream>
 
 namespace fs = std::filesystem;
 
@@ -81,7 +81,7 @@ evalConfig(SolverType type, const std::string& file)
                 printGrid(grid);
             } else {
                 countCorrect++;
-//                std::cout << "Solved correctly" << std::endl;
+                //                std::cout << "Solved correctly" << std::endl;
             }
         }
     }
@@ -93,16 +93,25 @@ evalConfig(SolverType type, const std::string& file)
 
     double mean = totalTime / static_cast<double>(times.size());
 
+    double min = std::numeric_limits<double>::max();
+    double max = std::numeric_limits<double>::min();
     double var = 0.0;
     for (auto t : times) {
         double x = t - mean;
         var += x * x;
+
+        if (t < min) {
+            min = t;
+        }
+        if (t > max) {
+            max = t;
+        }
     }
     double stddev = sqrt(var);
 
-
-    std::cout << "Solved " << countCorrect << "/" << sudokus.size() << " Sudokus correct. Took "
-              << totalTime << "ms. (Mean: " << mean << "ms StdDev: " << stddev << "ms)" << std::endl;
+    std::cout << "Solved " << countCorrect << "/" << sudokus.size() << " Sudokus correct. Took " << totalTime
+              << "ms. (Mean: " << mean << "ms StdDev: " << stddev << "ms Min: " << min << "ms Max: " << max << "ms)"
+              << std::endl;
 }
 
 int

@@ -100,7 +100,7 @@ struct DlxSolver::Impl
     std::vector<DataNode*> solution;
     DataNode* head = nullptr;
 
-    std::unique_ptr<std::vector<std::vector<size_t>>> solve(const std::vector<std::vector<int>>& constraintMatrix)
+    std::unique_ptr<std::vector<std::vector<size_t>>> solve(const std::vector<std::vector<size_t>>& constraintMatrix)
     {
 
         nodes.push_back(std::make_unique<ColumnNode>(0));
@@ -115,7 +115,7 @@ struct DlxSolver::Impl
         return result;
     }
 
-    void solveAll(const std::vector<std::vector<int>>& constraintMatrix,
+    void solveAll(const std::vector<std::vector<size_t>>& constraintMatrix,
                   const std::function<void(std::unique_ptr<std::vector<std::vector<size_t>>>)>& resultCollector)
     {
 
@@ -141,41 +141,34 @@ struct DlxSolver::Impl
         return dynamic_cast<ColumnNode*>(nodes.back().get());
     }
 
-    void encodeConstraints(const std::vector<std::vector<int>>& constraintMatrix)
+    void encodeConstraints(const std::vector<std::vector<size_t>>& constraintMatrix)
     {
+        size_t numCols = 9 * 9 * 4;
         head = createDataNode(nullptr);
-
-        // assumes that all rows in the matrix are of the same size.
-        size_t num_cols = constraintMatrix[0].size();
 
         // Create column nodes
         std::vector<ColumnNode*> columns;
-        columns.reserve(num_cols);
-        for (size_t i = 0; i < num_cols; i++) {
+        columns.reserve(numCols);
+        for (size_t i = 0; i < numCols; i++) {
             auto col = createColNode(i);
             // head->left is the last/rightmost node in the list because the lists are circular
             head->left->insertRight(col);
             columns.push_back(col);
         }
 
-        for (auto row : constraintMatrix) {
+        for (const auto& row : constraintMatrix) {
             DataNode* prev = nullptr;
-            for (size_t i = 0; i < num_cols; i++) {
-                int value = row[i];
+            for (size_t colIndex : row) {
+                auto col = columns[colIndex];
+                auto n = createDataNode(col);
+                // col->up is the last node in vertical direction for this column
+                col->up->insertBelow(n);
+                col->size += 1;
 
-                // Only cells with 1 are represented as nodes
-                if (value == 1) {
-                    auto col = columns[i];
-                    auto n = createDataNode(col);
-                    // col->up is the last node in vertical direction for this column
-                    col->up->insertBelow(n);
-                    col->size += 1;
-
-                    if (prev == nullptr) {
-                        prev = n;
-                    } else {
-                        prev->insertRight(n);
-                    }
+                if (prev == nullptr) {
+                    prev = n;
+                } else {
+                    prev->insertRight(n);
                 }
             }
         }
@@ -289,12 +282,12 @@ DlxSolver::DlxSolver(DlxSolver&&) noexcept = default;
 DlxSolver&
 DlxSolver::operator=(DlxSolver&&) noexcept = default;
 std::unique_ptr<std::vector<std::vector<size_t>>>
-DlxSolver::solve(const std::vector<std::vector<int>>& constraintMatrix)
+DlxSolver::solve(const std::vector<std::vector<size_t>>& constraintMatrix)
 {
     return impl->solve(constraintMatrix);
 }
 void
-DlxSolver::solve(const std::vector<std::vector<int>>& constraintMatrix,
+DlxSolver::solve(const std::vector<std::vector<size_t>>& constraintMatrix,
                  const std::function<void(std::unique_ptr<std::vector<std::vector<size_t>>>)>& resultCollector)
 {
     impl->solveAll(constraintMatrix, resultCollector);

@@ -22,9 +22,9 @@ class DlxSolver
     DlxSolver& operator=(DlxSolver&&) noexcept;
     DlxSolver& operator=(const DlxSolver&) = delete;
 
-    void solve(const std::vector<std::vector<int>>& constraintMatrix,
+    void solve(const std::vector<std::vector<size_t>>& constraintMatrix,
                const std::function<void(std::unique_ptr<std::vector<std::vector<size_t>>>)>& resultCollector);
-    std::unique_ptr<std::vector<std::vector<size_t>>> solve(const std::vector<std::vector<int>>& constraintMatrix);
+    std::unique_ptr<std::vector<std::vector<size_t>>> solve(const std::vector<std::vector<size_t>>& constraintMatrix);
 };
 
 #endif // DLX_H
