@@ -16,35 +16,51 @@ class SudokuApplication
 
   public:
     explicit SudokuApplication(const std::string& classifierPath)
-    : detector(std::make_unique<SudokuDetector>(classifierPath))
+      : detector(std::make_unique<SudokuDetector>(classifierPath))
     {}
 
     void loop(const std::vector<std::pair<std::filesystem::path, Quad>>& groundTruth) const
     {
-        int sudokuNum = 0;
-        for (const auto& item : groundTruth) {
+        size_t sudokuNum = 0;
+        while (true) {
             std::cout << "Sudoku " << sudokuNum << std::endl;
 
-            processSudoku(item.first, item.second);
-            sudokuNum++;
-            if (sudokuNum > 3)
-                exit(0);
+            auto [path, rect] = groundTruth[sudokuNum];
+
+            cv::Mat sudokuImg = cv::imread(path.string(), cv::IMREAD_COLOR);
+            auto detection = detector->detect(sudokuImg);
+
+            cv::Mat canvas = sudokuImg.clone();
+
+            detection->drawOverlay(canvas);
+
+            auto [scale, resizedCanvas] = resizeMaxSideLen(canvas, 1024);
+
+            cv::imshow("Sudoku", resizedCanvas);
+            int key = cv::waitKey();
+
+            switch (key) {
+                case -1:
+                case 'q':
+                    return;
+                case 'n':
+                    sudokuNum++;
+                    break;
+                case 'p':
+                    sudokuNum--;
+                    break;
+                default:
+                    sudokuNum++;
+                    // std::cout << "Pressed key: " << key << std::endl;
+            }
+            if (sudokuNum >= groundTruth.size()) {
+                sudokuNum = groundTruth.size() - 1;
+                std::cout << "Reached last Sudoku. Press q to quit." << std::endl;
+            } else if (sudokuNum < 0) {
+                sudokuNum = 0;
+                std::cout << "Reached first Sudoku. Press q to quit." << std::endl;
+            }
         }
-    }
-
-  private:
-    void processSudoku(const fs::path& path, const Quad& gt_bbox) const
-    {
-        cv::Mat sudokuImg = cv::imread(path.string(), cv::IMREAD_COLOR);
-        auto detection = detector->detect(sudokuImg);
-
-        cv::Mat canvas = sudokuImg.clone();
-
-        detection->drawOverlay(canvas);
-
-        auto [scale, resizedCanvas] = resizeMaxSideLen(canvas, 1024);
-        cv::imshow("Sudoku", resizedCanvas);
-        cv::waitKey();
     }
 };
 
