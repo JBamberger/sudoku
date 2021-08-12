@@ -36,7 +36,7 @@ operator<<(std::ostream& str, const Quad& data)
 }
 
 std::vector<std::pair<std::filesystem::path, Quad>>
-readGroundTruth(const std::filesystem::path& file)
+readGroundTruth(const std::filesystem::path& root, const std::filesystem::path& file)
 {
     std::ifstream inStream(file);
 
@@ -54,7 +54,7 @@ readGroundTruth(const std::filesystem::path& file)
         Quad q;
         lineStream >> p >> q;
         p.pop_back();
-        std::filesystem::path path(p);
+        std::filesystem::path path = root / p;
         output.emplace_back(path, q);
     }
     return output;

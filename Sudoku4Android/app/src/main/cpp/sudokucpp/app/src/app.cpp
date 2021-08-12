@@ -15,8 +15,8 @@ class SudokuApplication
     std::unique_ptr<SudokuDetector> detector;
 
   public:
-    explicit SudokuApplication()
-      : detector(std::make_unique<SudokuDetector>("D:/dev/sudoku/share/digit_classifier_ts.onnx"))
+    explicit SudokuApplication(const std::string& classifierPath)
+    : detector(std::make_unique<SudokuDetector>(classifierPath))
     {}
 
     void loop(const std::vector<std::pair<std::filesystem::path, Quad>>& groundTruth) const
@@ -26,8 +26,9 @@ class SudokuApplication
             std::cout << "Sudoku " << sudokuNum << std::endl;
 
             processSudoku(item.first, item.second);
-
             sudokuNum++;
+            if (sudokuNum > 3)
+                exit(0);
         }
     }
 
@@ -51,21 +52,25 @@ int
 main(int argc, char* argv[])
 {
     if (argc < 2) {
-        std::cerr << "Missing ground truth arg. Call as app.exe <path-to-gt>" << std::endl;
+        std::cerr << "Missing path to sources. Call as app.exe <path-to-sources>" << std::endl;
         exit(1);
     }
 
-    fs::path gtPath(argv[1]);
+    fs::path root(argv[1]);
+
+    fs::path gtPath = root / "data/sudokus/ground_truth_new.csv";
     if (!fs::exists(gtPath) || !fs::is_regular_file(gtPath)) {
         std::cerr << "The specified gt path is not a file." << std::endl;
         exit(1);
     }
 
-    auto gt = readGroundTruth(gtPath);
+    fs::path classifierPath = root / "share/digit_classifier_ts.onnx";
+
+    auto gt = readGroundTruth(root, gtPath);
 
     std::cout << "OpenCV Version: " << cv::getVersionString() << std::endl;
     std::cout << "Found " << gt.size() << " ground truth entries" << std::endl;
 
-    const auto app = SudokuApplication();
+    const auto app = SudokuApplication(classifierPath.string());
     app.loop(gt);
 }

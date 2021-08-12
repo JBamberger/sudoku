@@ -33,7 +33,7 @@ class Quad
 };
 
 std::vector<std::pair<std::filesystem::path, Quad>>
-readGroundTruth(const std::filesystem::path& file);
+readGroundTruth(const std::filesystem::path& root, const std::filesystem::path& file);
 
 template<typename T>
 cv::Point_<T>
