@@ -12,7 +12,6 @@
 //#include <opencv2/ximgproc.hpp>
 #include <ximgproc_compat.h>
 
-
 struct SudokuDetector::Impl
 {
     const int scaled_side_len = 1024;
@@ -277,8 +276,11 @@ struct SudokuDetector::Impl
         cv::Size paddedSize(patchSize + 2 * pad, patchSize + 2 * pad);
         const cv::Rect2i cropRect(pad, pad, patchSize, patchSize);
 
-        std::fill(std::begin(cellLabels), std::end(cellLabels), -1);
-        for (int i = 0; i < 81; i++) {
+        std::vector<size_t> indices;
+        indices.reserve(81);
+        std::vector<cv::Mat> patches;
+        patches.reserve(81);
+        for (size_t i = 0; i < 81; i++) {
             const auto& coordinates = cellCoordinates.at(i);
 
             if (!coordinates.empty()) {
@@ -291,7 +293,18 @@ struct SudokuDetector::Impl
 
                 const auto paddedCellPatch = unwarpPatch(grayImage, transformTarget, paddedSize);
                 const auto cellPatch = paddedCellPatch(cropRect);
-                cellLabels[i] = cellClassifier.classify(cellPatch);
+
+                patches.push_back(cellPatch);
+                indices.push_back(i);
+            }
+        }
+
+        std::fill(std::begin(cellLabels), std::end(cellLabels), -1);
+
+        if (!patches.empty()) {
+            auto labels = cellClassifier.classify(patches);
+            for (size_t i = 0; i < indices.size(); i++) {
+                cellLabels[indices[i]] = labels[i];
             }
         }
     }
