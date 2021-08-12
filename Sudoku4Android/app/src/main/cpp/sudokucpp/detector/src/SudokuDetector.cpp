@@ -12,12 +12,15 @@
 //#include <opencv2/ximgproc.hpp>
 #include <ximgproc_compat.h>
 
+
 struct SudokuDetector::Impl
 {
     const int scaled_side_len = 1024;
     CellClassifier cellClassifier;
 
-    explicit Impl(const std::string& classifierPath): cellClassifier(classifierPath) {}
+    explicit Impl(const std::string& classifierPath)
+      : cellClassifier(classifierPath)
+    {}
 
     std::unique_ptr<SudokuDetection> detect(const cv::Mat& sudokuImage)
     {
@@ -36,35 +39,16 @@ struct SudokuDetector::Impl
         cv::warpPerspective(sudokuImage, warped, detection->unwarpTransform, scaledSudokuSize, cv::INTER_AREA);
 
         detectCells(warped, detection->cellCoords);
+        // detectCellsFast(scaled_side_len, scaled_side_len, detection->cellCoords);
+
         classifyCells(warped, detection->cellCoords, detection->cellLabels);
         detection->foundAllCells =
           std::all_of(std::begin(detection->cellLabels), std::end(detection->cellLabels), [](int i) { return i >= 0; });
 
         if (detection->foundAllCells) {
             auto solver = SudokuSolver::create(SolverType::Dlx);
-
             detection->solution = solver->solve(detection->cellLabels);
         }
-
-        //        cv::Mat canvas = warped.clone();
-        ////        for (int i = 0; i < 81; i++) {
-        ////            const auto& contour = detection->cellCoords.at(i);
-        ////            if (contour.empty()) {
-        ////                continue;
-        ////            }
-        ////
-        ////            drawOrientedRect(canvas, contour);
-        ////
-        ////            const auto msg = std::to_string(detection->cellLabels.at(i));
-        ////            const auto center = contourCenter(contour);
-        ////            drawCenteredText(canvas, msg, center);
-        ////        }
-        //
-        //        cv::Mat overlay = detection->renderOverlay(scaled_side_len, scaled_side_len);
-        //        cv::Mat composite = compositeImage(canvas, overlay);
-        //
-        //        cv::imshow("Contours", composite);
-        //        cv::waitKey();
 
         return detection;
     }
@@ -310,6 +294,62 @@ struct SudokuDetector::Impl
                 cellLabels[i] = cellClassifier.classify(cellPatch);
             }
         }
+    }
+
+    static void detectCellsFast(size_t height, size_t width, std::array<std::vector<cv::Point>, 81>& cellCoords)
+    {
+        std::array<cv::Point2f, 4> sudokuCorners{
+            cv::Point2f(0, 0),
+            cv::Point2f(0, height),
+            cv::Point2f(width, height),
+            cv::Point2f(width, 0),
+        };
+
+        std::array<std::array<cv::Point, 10>, 10> gridCorners;
+        for (int row = 0; row < 10; ++row) {
+            for (int col = 0; col < 10; ++col) {
+                float dx = static_cast<float>(row) / static_cast<float>(9);
+                cv::Point2f upper = (1.f - dx) * sudokuCorners[0] + dx * sudokuCorners[1];
+                cv::Point2f lower = (1.f - dx) * sudokuCorners[3] + dx * sudokuCorners[2];
+
+                float dy = static_cast<float>(col) / static_cast<float>(9);
+                cv::Point2f corner = (1.f - dy) * upper + dy * lower;
+                gridCorners[row][col] = cv::Point(corner);
+            }
+        }
+        for (int row = 0; row < 9; ++row) {
+            for (int col = 0; col < 9; ++col) {
+                cellCoords[row * 9 + col].push_back(gridCorners[row][col]);
+                cellCoords[row * 9 + col].push_back(gridCorners[row][col + 1]);
+                cellCoords[row * 9 + col].push_back(gridCorners[row + 1][col + 1]);
+                cellCoords[row * 9 + col].push_back(gridCorners[row + 1][col]);
+            }
+        }
+
+        //        auto canvas = image.clone();
+        //        for (int row = 0; row < 10; ++row) {
+        //            for (int col = 0; col < 10; ++col) {
+        //                cv::drawMarker(canvas, gridCorners[row][col], { 0, 255, 0 });
+        //                cv::putText(canvas, "", gridCorners[row][col], cv::FONT_HERSHEY_SIMPLEX, 1, { 0, 255, 0 });
+        //            }
+        //        }
+        //        cv::imshow("corners", canvas);
+        //        cv::waitKey();
+
+        //        for (int cellNum = 0; cellNum < 81; cellNum++) {
+        //            int row = cellNum / 9, col = cellNum % 9;
+        //            auto& outRect = cellCoords.at(cellNum);
+        //
+        //            float dx = static_cast<float>(row) / 9.0f;
+        //            float dx1 = static_cast<float>(row) + 1 / 9.0f;
+        //            float dy = static_cast<float>(col) / 9.0f;
+        //            float dy1 = static_cast<float>(col) + 1 / 9.0f;
+        //
+        //            // p1 dx=row    A->B ; dy=col   A->D
+        //            // p2 dx=row+1  A->B ; dy=col   B->C
+        //            // p3 dx=row+1  D->C ; dy=col+1 B->C
+        //            // p4 dx=row    D->C ; dy=col+1 A->D
+        //        }
     }
 
     static void detectCells(const cv::Mat& image, std::array<std::vector<cv::Point>, 81>& cellCoords)
