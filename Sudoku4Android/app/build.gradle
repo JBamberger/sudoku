@@ -19,11 +19,13 @@ android {
         externalNativeBuild {
             // https://developer.android.com/ndk/guides/cmake.html
             cmake {
-                cppFlags "-std=c++17 -frtti -fexceptions"
+                cppFlags "-std=c++17" +
+                        " -frtti" + // Enable C++ runtime type information (RTTI)
+                        " -fexceptions" // Enable C++ exceptions
                 arguments "-DOpenCV_DIR=" + opencvsdk + "/sdk/native/jni",
 //                        "-DANDROID_ARM_NEON=TRUE",
-                        "-DANDROID_STL=c++_shared",
-                        "-DPACKAGE_TESTS=OFF"
+                        "-DANDROID_STL=c++_shared", // Use the shared standard lib instead of static linking to avoid duplicate definitions
+                        "-DPACKAGE_TESTS=OFF" // Do not package and build test code (leads to errors on Android)
             }
         }
     }
@@ -53,8 +55,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
     }
     kotlinOptions {
         jvmTarget = '1.8'
@@ -64,11 +66,12 @@ android {
 dependencies {
     implementation project(':opencv')
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
-    implementation 'androidx.core:core-ktx:1.3.2'
-    implementation 'androidx.appcompat:appcompat:1.2.0'
-    implementation 'com.google.android.material:material:1.3.0'
-    implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
+    implementation 'androidx.core:core-ktx:1.6.0'
+    implementation 'androidx.appcompat:appcompat:1.3.1'
+    implementation 'com.google.android.material:material:1.4.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.0'
+    implementation 'com.jakewharton.timber:timber:4.7.1'
     testImplementation 'junit:junit:4.13.2'
-    androidTestImplementation 'androidx.test.ext:junit:1.1.2'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.3'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
 }

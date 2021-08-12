@@ -1,5 +1,4 @@
-include ':app'
 rootProject.name = "Sudoku4Android"
-
+include ':app'
 include ':opencv'
 project(':opencv').projectDir = new File(opencvsdk + '/sdk')
