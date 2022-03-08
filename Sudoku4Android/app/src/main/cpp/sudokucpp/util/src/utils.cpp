@@ -5,7 +5,9 @@
 #include <algorithm>
 #include <array>
 #include <fstream>
+#include <ostream>
 #include <sstream>
+#include <utility>
 
 std::istream&
 operator>>(std::istream& str, Quad& data)
@@ -35,7 +37,7 @@ operator<<(std::ostream& str, const Quad& data)
     return str;
 }
 
-std::vector<std::pair<std::filesystem::path, Quad>>
+std::vector<SudokuGroundTruth>
 readGroundTruth(const std::filesystem::path& root, const std::filesystem::path& file)
 {
     std::ifstream inStream(file);
@@ -44,7 +46,7 @@ readGroundTruth(const std::filesystem::path& root, const std::filesystem::path& 
         throw std::exception();
     }
 
-    std::vector<std::pair<std::filesystem::path, Quad>> output;
+    std::vector<SudokuGroundTruth> output;
 
     std::string line;
     while (std::getline(inStream, line)) {
@@ -52,8 +54,9 @@ readGroundTruth(const std::filesystem::path& root, const std::filesystem::path& 
 
         std::string p;
         Quad q;
-        lineStream >> p >> q;
-        p.pop_back();
+
+        std::getline(lineStream, p, ',');
+        lineStream >> q;
         std::filesystem::path path = root / p;
         output.emplace_back(path, q);
     }

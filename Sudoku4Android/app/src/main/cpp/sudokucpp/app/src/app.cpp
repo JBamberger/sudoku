@@ -10,29 +10,33 @@
 
 namespace fs = std::filesystem;
 
-class SudokuApplication
+class SudokuDetectionBenchmark
 {
     std::unique_ptr<SudokuDetector> detector;
 
   public:
-    explicit SudokuApplication(const std::string& classifierPath)
+    explicit SudokuDetectionBenchmark(const std::string& classifierPath)
       : detector(std::make_unique<SudokuDetector>(classifierPath))
     {}
 
-    void loop(const std::vector<std::pair<std::filesystem::path, Quad>>& groundTruth) const
+    void loop(const std::vector<SudokuGroundTruth>& groundTruth) const
     {
         size_t sudokuNum = 0;
         while (true) {
-            std::cout << "Sudoku " << sudokuNum << std::endl;
 
-            auto [path, rect] = groundTruth[sudokuNum];
+            const auto& gtSudoku = groundTruth[sudokuNum];
+            std::cout << "Sudoku " << sudokuNum << " Path: " << gtSudoku.imagePath.string() << std::endl;
 
-            cv::Mat sudokuImg = cv::imread(path.string(), cv::IMREAD_COLOR);
+            cv::Mat sudokuImg = cv::imread(gtSudoku.imagePath.string(), cv::IMREAD_COLOR);
             auto detection = detector->detect(sudokuImg);
 
             cv::Mat canvas = sudokuImg.clone();
 
-            detection->drawOverlay(canvas);
+            if (detection->foundSudoku) {
+                detection->drawOverlay(canvas);
+            } else{
+                std::cerr << "Failed to detect sudoku!" << std::endl;
+            }
 
             auto [scale, resizedCanvas] = resizeMaxSideLen(canvas, 1024);
 
@@ -87,6 +91,6 @@ main(int argc, char* argv[])
     std::cout << "OpenCV Version: " << cv::getVersionString() << std::endl;
     std::cout << "Found " << gt.size() << " ground truth entries" << std::endl;
 
-    const auto app = SudokuApplication(classifierPath.string());
+    const auto app = SudokuDetectionBenchmark(classifierPath.string());
     app.loop(gt);
 }

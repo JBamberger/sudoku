@@ -28,4 +28,15 @@ class SudokuDetector
     std::unique_ptr<SudokuDetection> detect(const cv::Mat& sudokuImage);
 };
 
+
+
+// V2
+// binarize with various thresholds, and try for each one
+// detect contours
+// Recursively detect sudoku in contours:
+//      Crop contour
+//      find lines
+//      cluster lines by direction/angle
+//      find clusters with many lines perpendicular to each other
+
 #endif // SUDOKUDETECTOR_H

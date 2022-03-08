@@ -2,7 +2,9 @@ find_package(OpenCV 4 REQUIRED core imgcodecs imgproc highgui videoio dnn) # xim
 
 add_library(sudoku_detector STATIC
         src/SudokuDetector.cpp include/SudokuDetector.h
-        src/SudokuDetection.cpp include/SudokuDetection.h)
+        src/SudokuDetection.cpp include/SudokuDetection.h
+        src/detect_sudoku.cpp include/detect_sudoku.h
+        src/detect_sudoku_v2.cpp)
 target_include_directories(sudoku_detector PUBLIC
         ${OpenCV_INCLUDE_DIRS}
         sudoku_utils

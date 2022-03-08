@@ -5,17 +5,7 @@
 #include <opencv2/imgproc.hpp>
 #include <vector>
 
-template<typename T, size_t N>
-std::vector<cv::Point>
-asContour(const std::array<cv::Point_<T>, N>& points)
-{
-    std::vector<cv::Point> out;
-    out.reserve(N);
-    for (const auto& p : points) {
-        out.push_back(static_cast<cv::Point>(p));
-    }
-    return out;
-}
+
 
 template<typename T>
 void

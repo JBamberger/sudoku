@@ -1,14 +1,10 @@
+import argparse
 import os
 
 import cv2 as cv
 import numpy as np
 
-import config
 from utils import read_ground_truth
-
-GT_OUT_FILE = config.sudokus_gt_path
-SUDOKU_FILES = [os.path.join(config.sudokus_path, fn)
-                for fn in os.listdir(config.sudokus_path) if os.path.splitext(fn)[-1] == '.jpg']
 
 
 class PolygonSelector:
@@ -162,20 +158,19 @@ def annotate_sudoku_file(file):
     return line
 
 
-def annotate_bounding_poly():
-    with open(GT_OUT_FILE, 'w', encoding='utf8') as f:
-        for i, file in enumerate(SUDOKU_FILES):
-            print(f'[{i + 1}/{len(SUDOKU_FILES)}] {file}')
+def annotate_bounding_poly(sudoku_path_list, output_file):
+    with open(output_file, 'w', encoding='utf8') as f:
+        for i, file in enumerate(sudoku_path_list):
+            print(f'[{i + 1}/{len(sudoku_path_list)}] {file}')
 
             line = annotate_sudoku_file(file)
             print(line, end='')
             f.write(line)
 
 
-
-def rename_sudokus():
+def rename_sudokus(out_file):
     with open('ground_truth.renamed.csv', 'w', encoding='utf8') as f:
-        for i, (file_path, coords) in enumerate(read_ground_truth(GT_OUT_FILE)):
+        for i, (file_path, coords) in enumerate(read_ground_truth(out_file)):
             i += 31
             new_path = os.path.join(os.path.dirname(file_path), f'sudoku_{i:d}.jpg')
 
@@ -190,6 +185,23 @@ def rename_sudokus():
             f.write(line)
 
 
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--sudoku-dir', type=str, required=True, help='Directory where sudoku files are stored.')
+    parser.add_argument('--out-file', type=str, required=True, help='Path to the output csv file.')
+
+    args = parser.parse_args()
+
+    def is_image(file_name):
+        ext = os.path.splitext(file_name)[-1].lower()
+        return ext in ['.jpg', '.jpeg', '.png']
+
+    out_file = args.out_file
+    sudoku_file = [os.path.join(args.sudoku_dir, fn) for fn in os.listdir(args.sudoku_dir) if is_image(fn)]
+
+    annotate_bounding_poly(sudoku_file, out_file)
+    # rename_sudokus(out_file)
+
+
 if __name__ == '__main__':
-    annotate_bounding_poly()
-    # rename_sudokus()
+    main()
