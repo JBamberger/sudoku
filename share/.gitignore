@@ -1,1 +1,2 @@
-digit_classifier.pth
+*.pth
+*.onnx
