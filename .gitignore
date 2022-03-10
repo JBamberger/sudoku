@@ -1,15 +1,24 @@
 .idea/
 .vs/
 .vscode/
-venv/
+.gradle
+.DS_Store
+*.iml
+local.properties
 
 out/
 bin/
 build/
 cmake-build-*/
-data/
+captures/
+.externalNativeBuild
+.cxx/
+
 __pycache__/
 *.o
 *.exe
 *.dll
 *.lib
+
+venv/
+data/
