@@ -5,68 +5,6 @@
     android:gravity="bottom"
     android:orientation="vertical">
 
-
-    <TextView
-        android:id="@+id/exposureLabel"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_above="@+id/sensitivityLabel"
-        android:layout_alignParentLeft="true"
-        android:layout_marginBottom="60dp"
-        android:text="Exposure"
-        android:textColor="#FFFF00"
-        android:textSize="20sp" />
-
-    <TextView
-        android:id="@+id/exposureVal"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_above="@+id/exposureLabel"
-        android:layout_toRightOf="@+id/exposureLabel"
-        android:text="0"
-        android:textColor="#FFFF00"
-        android:textSize="16sp" />
-
-    <SeekBar
-        android:id="@+id/exposure_seekbar"
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:layout_alignTop="@+id/exposureLabel"
-        android:layout_toRightOf="@+id/exposureLabel"
-        android:max="100"
-        android:maxHeight="2dip"
-        android:minHeight="2dip" />
-
-    <TextView
-        android:id="@+id/sensitivityLabel"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_above="@+id/takePhoto"
-        android:layout_alignParentLeft="true"
-        android:text="Sensitivity"
-        android:textColor="#FFFF00"
-        android:textSize="20sp" />
-
-    <TextView
-        android:id="@+id/sensitivityVal"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_above="@+id/sensitivityLabel"
-        android:layout_toRightOf="@+id/sensitivityLabel"
-        android:text="0"
-        android:textColor="#FFFF00"
-        android:textSize="16sp" />
-
-    <SeekBar
-        android:id="@+id/sensitivity_seekbar"
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:layout_alignTop="@+id/sensitivityLabel"
-        android:layout_toRightOf="@+id/sensitivityLabel"
-        android:max="100"
-        android:maxHeight="2dip"
-        android:minHeight="2dip" />
-
     <ImageButton
         android:id="@+id/takePhoto"
         android:layout_width="80dp"

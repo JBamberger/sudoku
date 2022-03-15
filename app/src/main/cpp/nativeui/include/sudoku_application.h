@@ -27,8 +27,6 @@ public:
 
     void onTakePhoto();
 
-    void onCameraParameterChanged(int32_t code, int64_t val);
-
     // Window surface parameters
     void saveBufferGeometry(ANativeWindow *window);
 

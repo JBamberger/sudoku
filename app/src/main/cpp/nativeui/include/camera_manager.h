@@ -82,11 +82,6 @@ private:
     ACameraCaptureSession *captureSession_;
     CaptureSessionState captureSessionState_;
 
-    // set up exposure control
-    int64_t exposureTime_;
-    RangeValue<int64_t> exposureRange_;
-    int32_t sensitivity_;
-    RangeValue<int32_t> sensitivityRange_;
     volatile bool valid_;
 
     ACameraManager_AvailabilityCallbacks *GetManagerListener();
@@ -104,21 +99,10 @@ public:
 
     void EnumerateCamera(void);
 
-    bool MatchCaptureSizeRequest(int32_t requestWidth, int32_t requestHeight, ImageFormat *view);
-
     bool MatchCaptureSizeRequest(ANativeWindow *display, ImageFormat *view, ImageFormat *capture);
 
-    bool MatchCaptureSizeRequest(
-            int32_t requestWidth, int32_t requestHeight, ImageFormat *view, ImageFormat *capture);
-
-    void
-    CreateSession(ANativeWindow *previewWindow, ANativeWindow *jpgWindow, int32_t imageRotation);
-
-    void CreateSession(ANativeWindow *previewWindow, ANativeWindow *jpgWindow,
-                       bool manualPreview, int32_t imageRotation);
-
-    void CreateSession(ANativeWindow *previewWindow);
-
+    void CreateSession(
+            ANativeWindow *previewWindow, ANativeWindow *jpgWindow, int32_t imageRotation);
 
     bool GetSensorOrientation(int32_t *facing, int32_t *angle);
 
@@ -138,12 +122,6 @@ public:
     void StartPreview(bool start);
 
     bool TakePhoto(void);
-
-    bool GetExposureRange(int64_t *min, int64_t *max, int64_t *curVal);
-
-    bool GetSensitivityRange(int64_t *min, int64_t *max, int64_t *curVal);
-
-    void UpdateCameraRequestParameter(int32_t code, int64_t val);
 };
 
 // helper classes to hold enumerated camera

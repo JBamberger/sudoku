@@ -100,13 +100,9 @@ void SudokuApplication::onCameraPermission(bool granted) {
 
     if (cameraGranted_) {
         onAppInitWindow();
-    }else {
+    } else {
         LOGW("Permissions were not granted!");
     }
-}
-
-void SudokuApplication::onCameraParameterChanged(int32_t code, int64_t val) {
-    camera_->UpdateCameraRequestParameter(code, val);
 }
 
 /**

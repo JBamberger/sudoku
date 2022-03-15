@@ -41,29 +41,12 @@ int SudokuApplication::jniGetDisplayRotation() {
 void SudokuApplication::jniUpdateUI() {
     JNIEnv *jni;
     app_->activity->vm->AttachCurrentThread(&jni, nullptr);
-    int64_t range[3];
 
-    // Default class retrieval
     jclass clazz = jni->GetObjectClass(app_->activity->clazz);
-    jmethodID methodID = jni->GetMethodID(clazz, "updateUI", "([J)V");
+    jmethodID methodID = jni->GetMethodID(clazz, "updateUI", "()V");
+    ASSERT(methodID, "JavaUI interface Object failed(%p)", methodID);
 
-    // Parameter for updateUI: Semantics:  [exposure min, max, val, sensitivity min, max, val]
-    jlongArray initData = jni->NewLongArray(6);
-
-    ASSERT(initData && methodID, "JavaUI interface Object failed(%p, %p)", methodID, initData);
-
-    if (!camera_->GetExposureRange(&range[0], &range[1], &range[2])) {
-        memset(range, 0, sizeof(int64_t) * 3);
-    }
-
-    jni->SetLongArrayRegion(initData, 0, 3, range);
-
-    if (!camera_->GetSensitivityRange(&range[0], &range[1], &range[2])) {
-        memset(range, 0, sizeof(int64_t) * 3);
-    }
-    jni->SetLongArrayRegion(initData, 3, 3, range);
-
-    jni->CallVoidMethod(app_->activity->clazz, methodID, initData);
+    jni->CallVoidMethod(app_->activity->clazz, methodID);
     app_->activity->vm->DetachCurrentThread();
 }
 
@@ -93,16 +76,4 @@ Java_com_jbamberger_sudoku4android_NativeSudokuActivity_takePhoto(
         JNIEnv *env, jclass type) {
     std::thread takePhotoHandler(&SudokuApplication::onTakePhoto, getApplication());
     takePhotoHandler.detach();
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_jbamberger_sudoku4android_NativeSudokuActivity_onExposureChanged(
-        JNIEnv *env, jobject instance, jlong exposurePercent) {
-    getApplication()->onCameraParameterChanged(ACAMERA_SENSOR_EXPOSURE_TIME, exposurePercent);
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_jbamberger_sudoku4android_NativeSudokuActivity_onSensitivityChanged(
-        JNIEnv *env, jobject instance, jlong sensitivity) {
-    getApplication()->onCameraParameterChanged(ACAMERA_SENSOR_SENSITIVITY, sensitivity);
 }
