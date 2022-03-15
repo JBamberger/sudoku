@@ -5,26 +5,41 @@ plugins {
 android {
     compileSdkVersion 31
     buildToolsVersion "31.0.0"
-    ndkVersion "22.1.7171670"
+    ndkVersion "23.1.7779620"
 
     defaultConfig {
         applicationId "com.jbamberger.sudoku4android"
-        minSdkVersion 21
+        minSdkVersion 24
         targetSdkVersion 31
         versionCode 1
         versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         externalNativeBuild {
-            // https://developer.android.com/ndk/guides/cmake.html
+
+            ndk {
+                abiFilters 'arm64-v8a', 'x86' //, 'armeabi-v7a', 'x86_64'
+            }
+
             cmake {
-                cppFlags "-std=c++17" +
-                        " -frtti" + // Enable C++ runtime type information (RTTI)
-                        " -fexceptions" // Enable C++ exceptions
+                // https://developer.android.com/ndk/guides/cmake.html
+
+                cppFlags "-std=c++17"
+                // Exceptions and RTTI are enabled by default when using CMAKE to build.
+                //       + " -frtti"       // Enable C++ runtime type information (RTTI)
+                //       + " -fexceptions" // Enable C++ exceptions
+
                 arguments "-DOpenCV_DIR=" + opencvsdk + "/sdk/native/jni",
-//                        "-DANDROID_ARM_NEON=TRUE",
-                        "-DANDROID_STL=c++_shared", // Use the shared standard lib instead of static linking to avoid duplicate definitions
-                        "-DPACKAGE_TESTS=OFF" // Do not package and build test code (leads to errors on Android)
+
+                        // Enabled by default on NDK >=r21
+                        // "-DANDROID_ARM_NEON=TRUE",
+
+                        // Use the shared standard lib instead of static linking to avoid duplicate definitions
+                        "-DANDROID_STL=c++_shared",
+
+                        // Do not package and build test code (leads to errors on Android)
+                        "-DPACKAGE_TESTS=OFF"
+
             }
         }
     }
@@ -50,7 +65,6 @@ android {
         cmake {
             path "src/main/cpp/CMakeLists.txt"
             version "3.18.1"
-
         }
     }
     compileOptions {
