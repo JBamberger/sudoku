@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2017 The Android Open Source Project
+ * Modifications Copyright (C) 2022 Jannik Bamberger
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,24 +34,6 @@ enum class CaptureSessionState : int32_t {
     MAX_STATE
 };
 
-template<typename T>
-class RangeValue {
-public:
-    T min_, max_;
-
-    /**
-     * return absolute value from relative value
-     * value: in percent (50 for 50%)
-     */
-    T value(int percent) {
-        return static_cast<T>(min_ + (max_ - min_) * percent / 100);
-    }
-
-    RangeValue() { min_ = max_ = static_cast<T>(0); }
-
-    bool Supported(void) const { return (min_ != max_); }
-};
-
 enum PREVIEW_INDICES {
     PREVIEW_REQUEST_IDX = 0,
     JPG_CAPTURE_REQUEST_IDX,
@@ -66,15 +49,32 @@ struct CaptureRequestInfo {
     int sessionSequenceId_;
 };
 
-class CameraId;
+class CameraId {
+public:
+    ACameraDevice *device_;
+    std::string id_;
+    acamera_metadata_enum_android_lens_facing_t facing_;
+    bool available_;  // free to use ( no other apps are using
+    bool owner_;      // we are the owner of the camera
+    explicit CameraId(const char *id)
+            : device_(nullptr),
+              facing_(ACAMERA_LENS_FACING_FRONT),
+              available_(false),
+              owner_(false) {
+        id_ = id;
+    }
+
+    explicit CameraId(void) { CameraId(""); }
+};
+
 
 class NDKCamera {
 private:
     ACameraManager *cameraMgr_;
     std::map<std::string, CameraId> cameras_;
     std::string activeCameraId_;
-    uint32_t cameraFacing_;
-    uint32_t cameraOrientation_;
+    uint8_t cameraFacing_;
+    int32_t cameraOrientation_;
 
     std::vector<CaptureRequestInfo> requests_;
 
@@ -104,7 +104,7 @@ public:
     void CreateSession(
             ANativeWindow *previewWindow, ANativeWindow *jpgWindow, int32_t imageRotation);
 
-    bool GetSensorOrientation(int32_t *facing, int32_t *angle);
+    bool GetSensorOrientation(uint8_t *facing, int32_t *angle);
 
     void OnCameraStatusChanged(const char *id, bool available);
 
@@ -124,23 +124,5 @@ public:
     bool TakePhoto(void);
 };
 
-// helper classes to hold enumerated camera
-class CameraId {
-public:
-    ACameraDevice *device_;
-    std::string id_;
-    acamera_metadata_enum_android_lens_facing_t facing_;
-    bool available_;  // free to use ( no other apps are using
-    bool owner_;      // we are the owner of the camera
-    explicit CameraId(const char *id)
-            : device_(nullptr),
-              facing_(ACAMERA_LENS_FACING_FRONT),
-              available_(false),
-              owner_(false) {
-        id_ = id;
-    }
-
-    explicit CameraId(void) { CameraId(""); }
-};
 
 #endif  // CAMERA_NATIVE_CAMERA_H

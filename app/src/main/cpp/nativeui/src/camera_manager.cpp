@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2017 The Android Open Source Project
+ * Modifications Copyright (C) 2022 Jannik Bamberger
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #include <utility>
 #include <queue>
 #include <unistd.h>
@@ -76,36 +78,36 @@ public:
         portrait_ = false;
     }
 
-    DisplayDimension &operator=(const DisplayDimension &other) = default;
+    [[nodiscard]]  DisplayDimension &operator=(const DisplayDimension &other) = default;
 
-    bool isSameRatio(DisplayDimension &other) const {
+    [[nodiscard]] bool isSameRatio(const DisplayDimension &other) const {
         return (w_ * other.h_ == h_ * other.w_);
     }
 
-    bool operator>(DisplayDimension &other) const {
+    [[nodiscard]] bool operator>(const DisplayDimension &other) const {
         return (w_ >= other.w_ & h_ >= other.h_);
     }
 
-    bool operator==(DisplayDimension &other) const {
+    [[nodiscard]] bool operator==(const DisplayDimension &other) const {
         return (w_ == other.w_ && h_ == other.h_ && portrait_ == other.portrait_);
     }
 
-    DisplayDimension operator-(DisplayDimension &other) const {
+    [[nodiscard]] DisplayDimension operator-(const DisplayDimension &other) const {
         DisplayDimension delta(w_ - other.w_, h_ - other.h_);
         return delta;
     }
 
     void flip() { portrait_ = !portrait_; }
 
-    bool isPortrait() const { return portrait_; }
+    [[nodiscard]] bool isPortrait() const { return portrait_; }
 
-    int32_t width() const { return w_; }
+    [[nodiscard]] int32_t width() const { return w_; }
 
-    int32_t height() const { return h_; }
+    [[nodiscard]] int32_t height() const { return h_; }
 
-    int32_t org_width() { return (portrait_ ? h_ : w_); }
+    [[nodiscard]] int32_t org_width() const { return (portrait_ ? h_ : w_); }
 
-    int32_t org_height() { return (portrait_ ? w_ : h_); }
+    [[nodiscard]] int32_t org_height() const { return (portrait_ ? w_ : h_); }
 
 private:
     int32_t w_, h_;
@@ -178,7 +180,7 @@ bool NDKCamera::MatchCaptureSizeRequest(
 
 void NDKCamera::CreateSession(
         ANativeWindow *previewWindow, ANativeWindow *jpgWindow, int32_t imageRotation) {
-    // Create output from this app's ANativeWindow, and add into output container
+
     requests_[PREVIEW_REQUEST_IDX].outputNativeWindow_ = previewWindow;
     requests_[PREVIEW_REQUEST_IDX].template_ = TEMPLATE_PREVIEW;
 
@@ -293,41 +295,29 @@ void NDKCamera::EnumerateCamera() {
     ACameraManager_deleteCameraIdList(cameraIds);
 }
 
-/**
- * GetSensorOrientation()
- *     Retrieve current sensor orientation regarding to the phone device
- * orientation
- *     SensorOrientation is NOT settable.
- */
-bool NDKCamera::GetSensorOrientation(int32_t *facing, int32_t *angle) {
+bool NDKCamera::GetSensorOrientation(uint8_t *facing, int32_t *angle) {
     if (!cameraMgr_) {
         return false;
     }
 
     ACameraMetadata *metadataObj;
-    ACameraMetadata_const_entry face, orientation;
-    CALL_MGR(getCameraCharacteristics(cameraMgr_, activeCameraId_.c_str(),
-                                      &metadataObj));
+    CALL_MGR(getCameraCharacteristics(cameraMgr_, activeCameraId_.c_str(), &metadataObj));
+
+    ACameraMetadata_const_entry face;
     CALL_METADATA(getConstEntry(metadataObj, ACAMERA_LENS_FACING, &face));
-    cameraFacing_ = static_cast<int32_t>(face.data.u8[0]);
+    cameraFacing_ = face.data.u8[0];
 
-    CALL_METADATA(
-            getConstEntry(metadataObj, ACAMERA_SENSOR_ORIENTATION, &orientation));
-
-    LOGI("====Current SENSOR_ORIENTATION: %8d", orientation.data.i32[0]);
+    ACameraMetadata_const_entry orientation;
+    CALL_METADATA(getConstEntry(metadataObj, ACAMERA_SENSOR_ORIENTATION, &orientation));
+    cameraOrientation_ = orientation.data.i32[0];
 
     ACameraMetadata_free(metadataObj);
-    cameraOrientation_ = orientation.data.i32[0];
 
     if (facing) *facing = cameraFacing_;
     if (angle) *angle = cameraOrientation_;
     return true;
 }
 
-/**
- * StartPreview()
- *   Toggle preview start/stop
- */
 void NDKCamera::StartPreview(bool start) {
     if (start) {
         CALL_SESSION(setRepeatingRequest(captureSession_, nullptr, 1,
@@ -336,15 +326,10 @@ void NDKCamera::StartPreview(bool start) {
     } else if (captureSessionState_ == CaptureSessionState::ACTIVE) {
         ACameraCaptureSession_stopRepeating(captureSession_);
     } else {
-        ASSERT(false, "Conflict states(%s, %d)", (start ? "true" : "false"), captureSessionState_);
+        ASSERT(false, "No active session to stop! SessionState=%d)", captureSessionState_);
     }
 }
 
-/**
- * Capture one jpg photo into
- *     /sdcard/DCIM/Camera
- * refer to WriteFile() for details
- */
 bool NDKCamera::TakePhoto() {
     if (captureSessionState_ == CaptureSessionState::ACTIVE) {
         ACameraCaptureSession_stopRepeating(captureSession_);
