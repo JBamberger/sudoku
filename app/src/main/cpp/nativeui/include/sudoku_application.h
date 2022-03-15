@@ -24,6 +24,7 @@
 #include <thread>
 
 #include "camera_manager.h"
+#include "SudokuDetector.h"
 
 class SudokuApplication {
 public:
@@ -64,8 +65,12 @@ private:
 
     int jniGetDisplayRotation();
 
+    std::string jniGetModelPath();
+
 
     struct android_app *app_;
+
+    std::unique_ptr<SudokuDetector> sudokuDetector;
 
     ImageFormat savedNativeWinRes_;
     bool cameraGranted_;

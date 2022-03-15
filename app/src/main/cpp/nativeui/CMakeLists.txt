@@ -37,5 +37,15 @@ target_link_libraries(nativeui
         m
         native_app_glue
         camera2ndk
-        mediandk)
-target_include_directories(nativeui PRIVATE include)
+        mediandk
+        ${OpenCV_LIBRARIES}
+        sudoku_utils
+        sudoku_detector
+        digit_classifier
+)
+target_include_directories(nativeui PRIVATE
+        include
+        sudoku_utils
+        sudoku_detector
+        digit_classifier
+)

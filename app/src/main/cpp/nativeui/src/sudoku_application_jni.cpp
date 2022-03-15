@@ -18,6 +18,27 @@
 #include "sudoku_application.h"
 #include <native_debug.h>
 
+std::string jstring2string(JNIEnv *env, jstring jStr) {
+    if (!jStr)
+        return "";
+
+    const jclass stringClass = env->GetObjectClass(jStr);
+    const jmethodID getBytes = env->GetMethodID(stringClass, "getBytes", "(Ljava/lang/String;)[B");
+    const jbyteArray stringJbytes = (jbyteArray) env->CallObjectMethod(jStr, getBytes,
+                                                                       env->NewStringUTF("UTF-8"));
+
+    size_t length = (size_t) env->GetArrayLength(stringJbytes);
+    jbyte *pBytes = env->GetByteArrayElements(stringJbytes, NULL);
+
+    std::string ret = std::string((char *) pBytes, length);
+    env->ReleaseByteArrayElements(stringJbytes, pBytes, JNI_ABORT);
+
+    env->DeleteLocalRef(stringJbytes);
+    env->DeleteLocalRef(stringClass);
+    return ret;
+}
+
+
 void SudokuApplication::jniRequestCameraPermission() {
     if (!app_) return;
 
@@ -52,6 +73,29 @@ int SudokuApplication::jniGetDisplayRotation() {
 
     activity->vm->DetachCurrentThread();
     return newOrientation;
+}
+
+std::string SudokuApplication::jniGetModelPath() {
+
+
+    ASSERT(app_, "Application is not initialized");
+
+    JNIEnv *env;
+    ANativeActivity *activity = app_->activity;
+    activity->vm->GetEnv((void **) &env, JNI_VERSION_1_6);
+
+    activity->vm->AttachCurrentThread(&env, nullptr);
+
+    jobject activityObj = env->NewGlobalRef(activity->clazz);
+    jclass clz = env->GetObjectClass(activityObj);
+    auto jmodel_path = (jstring) (env->CallObjectMethod(
+            activityObj, env->GetMethodID(clz, "getModelPath", "()Ljava/lang/String;")));
+    env->DeleteGlobalRef(activityObj);
+
+    std::string model_path = jstring2string(env, jmodel_path);
+
+    activity->vm->DetachCurrentThread();
+    return model_path;
 }
 
 void SudokuApplication::jniUpdateUI() {

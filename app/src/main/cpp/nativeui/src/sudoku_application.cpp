@@ -16,6 +16,9 @@
  */
 
 #include <cstdio>
+#include <chrono>
+#include <opencv2/core/mat.hpp>
+#include <opencv2/imgproc.hpp>
 #include "sudoku_application.h"
 #include "native_debug.h"
 
@@ -26,8 +29,9 @@ SudokuApplication::SudokuApplication(android_app *app)
           cameraReady_(false),
           camera_(nullptr),
           yuvReader_(nullptr),
-          jpgReader_(nullptr) {
-    memset(&savedNativeWinRes_, 0, sizeof(savedNativeWinRes_));
+          jpgReader_(nullptr),
+          sudokuDetector(nullptr) {
+    memset(&savedNativeWinRes_, 0, sizeof(savedNativeWinRes_));;
 }
 
 SudokuApplication::~SudokuApplication() {
@@ -76,7 +80,7 @@ void SudokuApplication::createCamera() {
 
 int32_t SudokuApplication::computeImageRotation() {
     uint8_t facing = 0;
-    int32_t  angle = 0, imageRotation = 0;
+    int32_t angle = 0, imageRotation = 0;
     if (camera_->GetSensorOrientation(&facing, &angle)) {
         if (facing == ACAMERA_LENS_FACING_FRONT) {
             imageRotation = (angle + rotation_) % 360;
@@ -139,13 +143,32 @@ void SudokuApplication::pollAndDrawFrame() {
         return;
     }
 
+    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+
     // Converts YUV to RGBA8888 and outputs the image in the preview buffer
     yuvReader_->DisplayImage(&buf, image);
 
-//    // Wrap output buffer with cv::Mat to allow access from OpenCV
-//    auto &display_mat = cv::Mat(buffer.height, buffer.stride, CV_8UC4, buffer.bits);
-//
-//    // TODO: perform cv processing
+    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    LOGI("DisplayImage time: %8.04fms",
+         (std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()) / 1000.0);
+
+
+    // Wrap output buffer with cv::Mat to allow access from OpenCV
+    auto display_mat = cv::Mat(buf.height, buf.stride, CV_8UC4, buf.bits);
+
+//    cv::circle(display_mat, {100, 100}, 100, {0, 255, 0}, 5);
+
+    if (!sudokuDetector) {
+        sudokuDetector = std::make_unique<SudokuDetector>(jniGetModelPath());
+    }
+
+    // TODO: perform cv processing
+
+//    const auto detection = sudokuDetector->detect(display_mat);
+//    if (detection->foundSudoku) {
+//        detection->drawOverlay(display_mat);
+//    }
+
 
     ANativeWindow_unlockAndPost(app_->window);
     ANativeWindow_release(app_->window);

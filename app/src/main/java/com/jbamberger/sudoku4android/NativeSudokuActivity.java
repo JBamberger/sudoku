@@ -123,7 +123,7 @@ public class NativeSudokuActivity extends NativeActivity
                     grantResults[1] == PackageManager.PERMISSION_GRANTED);
         }
     }
-    
+
     public void updateUI() {
         runOnUiThread(() -> {
             try {
@@ -173,6 +173,11 @@ public class NativeSudokuActivity extends NativeActivity
         return 90 * ((WindowManager) (getSystemService(WINDOW_SERVICE)))
                 .getDefaultDisplay()
                 .getRotation();
+    }
+
+    public String getModelPath() {
+        String classifierPath = Utils.assetFileToLocal(this, "digit_classifier_ts.onnx");
+        return classifierPath;
     }
 
     native static void notifyCameraPermission(boolean granted);
