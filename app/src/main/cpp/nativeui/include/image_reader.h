@@ -20,6 +20,7 @@
 
 #include <media/NdkImageReader.h>
 #include <functional>
+#include <opencv2/core/types.hpp>
 
 /*
  * ImageFormat:
@@ -29,6 +30,32 @@ struct ImageFormat {
     int32_t width;
     int32_t height;
     int32_t format;  // Through out this demo, the format is fixed to YUV_420 format
+};
+
+struct ImagePlane {
+    int32_t length;
+    uint8_t *data;
+    int32_t rowStride;
+    int32_t pixelStride;
+};
+
+class Image {
+private:
+    AImage *image_;
+public:
+    explicit Image(AImage *image);
+
+    ~Image();
+
+    cv::Rect cropRect() const;
+
+    int32_t getFormat() const;
+
+    int32_t getNumPlanes() const;
+
+    cv::Size size() const;
+
+    ImagePlane getImagePlane(int planeIdx) const;
 };
 
 class ImageReader {
@@ -46,18 +73,13 @@ public:
     /**
      * Retrieve Image on the top of Reader's queue
      */
-    AImage *GetNextImage();
+    std::unique_ptr<Image> GetNextImage();
 
     /**
     * Retrieve Image on the back of Reader's queue, dropping older images
     */
-    AImage *GetLatestImage();
+    std::unique_ptr<Image> GetLatestImage();
 
-    /**
-     * Delete Image
-     * @param image {@link AImage} instance to be deleted
-     */
-    static void DeleteImage(AImage *image);
 
     /**
      * AImageReader callback handler. Called by AImageReader when a frame is
@@ -68,17 +90,14 @@ public:
 
     /**
      * DisplayImage()
-     *   Present camera image to the given display buffer. Avaliable image is
-     * converted
+     *   Present camera image to the given display buffer. Available image is converted
      *   to display buffer format. Supported display format:
      *      WINDOW_FORMAT_RGBX_8888
      *      WINDOW_FORMAT_RGBA_8888
      *   @param buf {@link ANativeWindow_Buffer} for image to display to.
-     *   @param image a {@link AImage} instance, source of image conversion.
-     *            it will be deleted via {@link AImage_delete}
-     *   @return true on success, false on failure
+     *   @param image
      */
-    bool DisplayImage(ANativeWindow_Buffer *buf, AImage *image) const;
+    bool DisplayImage(ANativeWindow_Buffer *buf, std::unique_ptr<Image> image) const;
 
     /**
      * Configure the rotation angle necessary to apply to

@@ -133,20 +133,20 @@ void SudokuApplication::onCameraPermission(bool granted) {
 void SudokuApplication::pollAndDrawFrame() {
     if (!cameraReady_ || !yuvReader_) return;
 
-    AImage *image = yuvReader_->GetLatestImage();
+    std::unique_ptr<Image> image = yuvReader_->GetLatestImage();
     if (!image) return;
 
     ANativeWindow_acquire(app_->window);
     ANativeWindow_Buffer buf;
     if (ANativeWindow_lock(app_->window, &buf, nullptr) < 0) {
-        ImageReader::DeleteImage(image);
+        image = nullptr;
         return;
     }
 
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
     // Converts YUV to RGBA8888 and outputs the image in the preview buffer
-    yuvReader_->DisplayImage(&buf, image);
+    yuvReader_->DisplayImage(&buf, std::move(image));
 
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
     LOGI("DisplayImage time: %8.04fms",

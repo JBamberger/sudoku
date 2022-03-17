@@ -57,9 +57,49 @@ void OnImageCallback(void *ctx, AImageReader *reader) {
     reinterpret_cast<ImageReader *>(ctx)->ImageCallback(reader);
 }
 
-/**
- * Constructor
- */
+Image::Image(AImage *image) : image_(image) {
+}
+
+Image::~Image() {
+    if (image_) {
+        AImage_delete(image_);
+    }
+}
+
+cv::Rect Image::cropRect() const {
+    AImageCropRect srcRect;
+    AImage_getCropRect(image_, &srcRect);
+    return cv::Rect(cv::Point(srcRect.left, srcRect.top),
+                    cv::Point(srcRect.right, srcRect.bottom));
+}
+
+int32_t Image::getFormat() const {
+    int32_t srcFormat = -1;
+    AImage_getFormat(image_, &srcFormat);
+    return srcFormat;
+}
+
+int32_t Image::getNumPlanes() const {
+    int32_t numPlanes = 0;
+    AImage_getNumberOfPlanes(image_, &numPlanes);
+    return numPlanes;
+}
+
+cv::Size Image::size() const {
+    int32_t h = -1, w = -1;
+    AImage_getWidth(image_, &h);
+    AImage_getWidth(image_, &w);
+    return cv::Size(w, h);
+}
+
+ImagePlane Image::getImagePlane(int planeIdx) const {
+    ImagePlane plane{};
+    AImage_getPlaneData(image_, planeIdx, &plane.data, &plane.length);
+    AImage_getPlaneRowStride(image_, planeIdx, &plane.rowStride);
+    AImage_getPlanePixelStride(image_, planeIdx, &plane.pixelStride);
+    return plane;
+}
+
 ImageReader::ImageReader(ImageFormat *res, enum AIMAGE_FORMATS format)
         : presentRotation_(0), reader_(nullptr) {
     callback_ = nullptr;
@@ -116,144 +156,101 @@ ANativeWindow *ImageReader::GetNativeWindow() {
     return nativeWindow;
 }
 
-/**
- * GetNextImage()
- *   Retrieve the next image in ImageReader's bufferQueue, NOT the last image so
- * no image is skipped. Recommended for batch/background processing.
- */
-AImage *ImageReader::GetNextImage() {
+std::unique_ptr<Image> ImageReader::GetNextImage() {
     AImage *image;
     media_status_t status = AImageReader_acquireNextImage(reader_, &image);
     if (status != AMEDIA_OK) {
         return nullptr;
     }
-    return image;
+    return std::make_unique<Image>(image);
 }
 
-/**
- * GetLatestImage()
- *   Retrieve the last image in ImageReader's bufferQueue, deleting images in
- * in front of it on the queue. Recommended for real-time processing.
- */
-AImage *ImageReader::GetLatestImage() {
+std::unique_ptr<Image> ImageReader::GetLatestImage() {
     AImage *image;
     media_status_t status = AImageReader_acquireLatestImage(reader_, &image);
     if (status != AMEDIA_OK) {
         return nullptr;
     }
-    return image;
+    return std::make_unique<Image>(image);
 }
 
-/**
- * Delete Image
- * @param image {@link AImage} instance to be deleted
- */
-void ImageReader::DeleteImage(AImage *image) {
-    if (image) AImage_delete(image);
-}
-
-
-cv::Mat copyImageToSurface(ANativeWindow_Buffer *buf, AImage *image, int32_t rotation) {
-    /// y luminance
-    /// u chroma (blue projection)
-    /// v chroma (red projection)
+bool ImageReader::DisplayImage(ANativeWindow_Buffer *buf, std::unique_ptr<Image> image) const {
+    ASSERT(buf->format == WINDOW_FORMAT_RGBX_8888 ||
+           buf->format == WINDOW_FORMAT_RGBA_8888,
+           "Not supported buffer format");
 
     // Wrapper to access the native window buffer
     auto rgbOutput = cv::Mat(buf->height, buf->stride, CV_8UC4, buf->bits);
 
     // Region of the image that can be used for processing
-    AImageCropRect srcRect;
-    AImage_getCropRect(image, &srcRect);
-    cv::Rect yRect(cv::Point(srcRect.left, srcRect.top),
-                   cv::Point(srcRect.right, srcRect.bottom));
-    cv::Rect uvRect(cv::Point(srcRect.left / 2, srcRect.top / 2),
-                    cv::Point(srcRect.right / 2, srcRect.bottom / 2));
+    auto yRect = image->cropRect();
+    cv::Rect uvRect(
+            cv::Point(yRect.x / 2, yRect.y / 2),
+            cv::Size(yRect.width / 2, yRect.height / 2));
 
-    int32_t srcFormat = -1;
-    AImage_getFormat(image, &srcFormat);
-    ASSERT(AIMAGE_FORMAT_YUV_420_888 == srcFormat, "Failed to get format");
+    int32_t srcFormat = image->getFormat();
+    ASSERT(AIMAGE_FORMAT_YUV_420_888 == srcFormat,
+           "Invalid format. Must be %d but is %d.", AIMAGE_FORMAT_YUV_420_888, srcFormat);
 
-    int32_t numPlanes = 0;
-    AImage_getNumberOfPlanes(image, &numPlanes);
-    ASSERT(numPlanes == 3, "Image must have 3 planes. Has %d", numPlanes);
+    int32_t numPlanes = image->getNumPlanes();
+    ASSERT(numPlanes == 3, "Image must have 3 planes. Has %d planes.", numPlanes);
 
-    int32_t h = -1, w = -1;
-    AImage_getWidth(image, &h);
-    AImage_getWidth(image, &w);
+    cv::Size imgSize = image->size();
+    ImagePlane yPlane = image->getImagePlane(0);
+    ImagePlane uPlane = image->getImagePlane(1);
+    ImagePlane vPlane = image->getImagePlane(2);
 
-    int32_t yLen, uLen, vLen;
-    uint8_t *yPixel, *uPixel, *vPixel;
-    AImage_getPlaneData(image, 0, &yPixel, &yLen);
-    AImage_getPlaneData(image, 1, &vPixel, &vLen);
-    AImage_getPlaneData(image, 2, &uPixel, &uLen);
-
-    int32_t yRowStride, uRowStride, vRowStride;
-    AImage_getPlaneRowStride(image, 0, &yRowStride);
-    AImage_getPlaneRowStride(image, 1, &uRowStride);
-    AImage_getPlaneRowStride(image, 2, &vRowStride);
-
-    int32_t yPixelStride, uPixelStride, vPixelStride;
-    AImage_getPlanePixelStride(image, 0, &yPixelStride);
-    AImage_getPlanePixelStride(image, 1, &uPixelStride);
-    AImage_getPlanePixelStride(image, 2, &vPixelStride);
-
-    LOGI("Output: Format %d h=%d, w=%d, stride=%d len=%d",
-         buf->format, buf->height, buf->width, buf->stride, buf->height * buf->width);
-    LOGI("Image:  Format %d, numPlanes %d, h=%d, w=%d, len=%d", srcFormat, numPlanes, h, w, h * w);
-    LOGI("Rect: %d %d %d %d", srcRect.left, srcRect.right, srcRect.top, srcRect.bottom);
-    LOGI("Length:    %20d %20d %20d %20d", yLen, uLen, vLen, yLen + uLen + vLen);
-    LOGI("Ptr:       %20p %20p %20p", (void *) yPixel, (void *) uPixel, (void *) vPixel);
-    LOGI("RowStride: %20d %20d %20d", yRowStride, uRowStride, vRowStride);
-    LOGI("PixStride: %20d %20d %20d", yPixelStride, uPixelStride, vPixelStride);
-
-
-    // plane #0 Y
-    // plane #1 U (Cb)
-    // plane #2 V (Cr)
-
+    // plane0 Y, plane1 U (Cb), plane2 V (Cr)
     // Y not interleaved with U/V, stride==1
-    ASSERT(yPixelStride == 1, "Luminance (Y) stride must be 1.");
+    ASSERT(yPlane.pixelStride == 1, "Luminance (Y) stride must be 1.");
     // U stride == V stride
-    ASSERT(uPixelStride == vPixelStride, "Chroma pixel strides must be equal.")
-    ASSERT(uRowStride == vRowStride, "Chroma row strides must be equal.")
+    ASSERT(uPlane.pixelStride == vPlane.pixelStride, "Chroma pixel strides must be equal.")
+    ASSERT(uPlane.rowStride == vPlane.rowStride, "Chroma row strides must be equal.")
+
+
+//    LOGI("Output: Format %d h=%d, w=%d, stride=%d len=%d",
+//         buf->format, buf->height, buf->width, buf->stride, buf->height * buf->width);
+//    LOGI("Image: numPlanes %d, h=%d, w=%d, len=%d", numPlanes, h, w, h * w);
+//    LOGI("Rect: %d %d %d %d", srcRect.left, srcRect.right, srcRect.top, srcRect.bottom);
+//    LOGI("Length:    %20d %20d %20d %20d", yLen, uLen, vLen, yLen + uLen + vLen);
+//    LOGI("Ptr:       %20p %20p %20p", (void *) yPixel, (void *) uPixel, (void *) vPixel);
+//    LOGI("RowStride: %20d %20d %20d", yRowStride, uRowStride, vRowStride);
+//    LOGI("PixStride: %20d %20d %20d", yPixelStride, uPixelStride, vPixelStride);
 
     cv::Mat rgbNoRot;
-    if (uPixelStride == 1) { // Chroma channels are not interleaved
-        auto copyPlane = [](
-                const uint8_t *const plane, int32_t stride, const cv::Rect &bounds, uint8_t *out) {
-
-            if (bounds.x == 0 && bounds.width == stride) {
-                memcpy(out, plane + bounds.y * stride, bounds.height * bounds.width);
+    if (uPlane.pixelStride == 1) { // Chroma channels are not interleaved
+        auto copyPlane = [](const ImagePlane &p, const cv::Rect &bounds, uint8_t *out) {
+            if (bounds.x == 0 && bounds.width == p.rowStride) {
+                memcpy(out, p.data + bounds.y * p.rowStride, bounds.height * bounds.width);
             } else {
                 for (int i = bounds.y; i < bounds.y + bounds.height; i++) {
-                    memcpy(out, plane + i * stride, bounds.width);
+                    memcpy(out, p.data + i * p.rowStride, bounds.width);
                 }
             }
         };
 
-        auto ySize = yRect.height * yRect.width;
-        auto uvSize = uvRect.height * uvRect.width;
-
         cv::Mat yuvMat(yRect.height + yRect.height / 2, yRect.width, CV_8UC1);
         uint8_t *yuvPtr = yuvMat.data;
-        copyPlane(yPixel, yRowStride, yRect, yuvPtr);
-        yuvPtr += ySize;
-        copyPlane(uPixel, uRowStride, uvRect, yuvPtr);
-        yuvPtr += uvSize;
-        copyPlane(vPixel, vRowStride, uvRect, yuvPtr);
+        copyPlane(yPlane, yRect, yuvPtr);
+        yuvPtr += yRect.area();
+        copyPlane(uPlane, uvRect, yuvPtr);
+        yuvPtr += uvRect.area();
+        copyPlane(vPlane, uvRect, yuvPtr);
 
-        cv::cvtColor(yuvMat, rgbNoRot, cv::COLOR_YUV2BGRA_I420);
-    } else if (uPixelStride == 2) { // Chroma channels are interleaved
-        cv::Mat y_mat(h, w, CV_8UC1, yPixel, yRowStride);
-        y_mat = y_mat(yRect);
+        cv::cvtColor(yuvMat, rgbNoRot, cv::COLOR_YUV2RGBA_I420);
+    } else if (uPlane.pixelStride == 2) { // Chroma channels are interleaved
+        cv::Mat yMat(imgSize.height, imgSize.width, CV_8UC1, yPlane.data , yPlane.rowStride);
+        yMat = yMat(yRect);
 
-        long addr_diff = vPixel - uPixel;
-        if (addr_diff == 1) {
-            cv::Mat uv_mat(h / 2, w / 2, CV_8UC2, uPixel, uRowStride);
-            cv::cvtColorTwoPlane(y_mat, uv_mat(uvRect), rgbNoRot, cv::COLOR_YUV2RGBA_NV21);
-        } else if (addr_diff == -1) {
-            cv::Mat uv_mat(h / 2, w / 2, CV_8UC2, vPixel, vRowStride);
-            cv::cvtColorTwoPlane(y_mat, uv_mat(uvRect), rgbNoRot, cv::COLOR_YUV2RGBA_NV12);
+        long addrDiff = vPlane.data - uPlane.data;
+        if (addrDiff == 1) {
+            cv::Mat uvMat(
+                    imgSize.height / 2, imgSize.width / 2, CV_8UC2, uPlane.data, uPlane.rowStride);
+            cv::cvtColorTwoPlane(yMat, uvMat(uvRect), rgbNoRot, cv::COLOR_YUV2RGBA_NV21);
+        } else if (addrDiff == -1) {
+            cv::Mat uvMat(
+                    imgSize.height / 2, imgSize.width / 2, CV_8UC2, vPlane.data, vPlane.rowStride);
+            cv::cvtColorTwoPlane(yMat, uvMat(uvRect), rgbNoRot, cv::COLOR_YUV2RGBA_NV12);
         } else {
             // TODO: Implement handling for interleaved data that does not share the same memory
             //  location.
@@ -268,7 +265,7 @@ cv::Mat copyImageToSurface(ANativeWindow_Buffer *buf, AImage *image, int32_t rot
            rgbNoRot.rows, rgbNoRot.cols, yRect.height, yRect.width)
 
     cv::Mat rot;
-    switch (rotation) {
+    switch (presentRotation_) {
         case 0:
             rot = rgbNoRot;
             break;
@@ -282,38 +279,11 @@ cv::Mat copyImageToSurface(ANativeWindow_Buffer *buf, AImage *image, int32_t rot
             cv::rotate(rgbNoRot, rot, cv::ROTATE_90_COUNTERCLOCKWISE);
             break;
         default:
-            ASSERT(0, "NOT recognized display rotation: %d", rotation);
+            ASSERT(0, "NOT recognized display rotation: %d", presentRotation_);
     }
 
     rot.copyTo(rgbOutput({0, 0, rot.cols, rot.rows}));
 
-    return rgbOutput;
-}
-
-/**
- * Convert yuv image inside AImage into ANativeWindow_Buffer ANativeWindow_Buffer format is
- * guaranteed to be WINDOW_FORMAT_RGBX_8888 or WINDOW_FORMAT_RGBA_8888.
- * @param buf a {@link ANativeWindow_Buffer } instance, destination of image conversion
- * @param image a {@link AImage} instance, source of image conversion.
- *            it will be deleted via {@link AImage_delete}
- */
-bool ImageReader::DisplayImage(ANativeWindow_Buffer *buf, AImage *image) const {
-    ASSERT(buf->format == WINDOW_FORMAT_RGBX_8888 ||
-           buf->format == WINDOW_FORMAT_RGBA_8888,
-           "Not supported buffer format");
-
-    int32_t srcFormat = -1;
-    AImage_getFormat(image, &srcFormat);
-    ASSERT(AIMAGE_FORMAT_YUV_420_888 == srcFormat, "Failed to get format");
-
-    int32_t srcPlanes = 0;
-    AImage_getNumberOfPlanes(image, &srcPlanes);
-    ASSERT(srcPlanes == 3, "Is not 3 planes");
-
-
-    copyImageToSurface(buf, image, presentRotation_);
-
-    AImage_delete(image);
     return true;
 }
 
