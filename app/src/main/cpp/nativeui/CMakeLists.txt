@@ -27,7 +27,7 @@ add_library(nativeui SHARED
         src/android_main.cpp
         src/sudoku_application.cpp
         src/sudoku_application_jni.cpp
-        src/image_reader.cpp
+        src/cv_image_reader.cpp
         src/camera_manager.cpp
         src/camera_listeners.cpp
         src/camera_utils.cpp)

@@ -103,14 +103,6 @@ private:
     std::function<void(void *ctx, const char *fileName)> callback_;
     void *callbackCtx_;
 
-    static void PresentImage(ANativeWindow_Buffer *buf, AImage *image);
-
-    static void PresentImage90(ANativeWindow_Buffer *buf, AImage *image);
-
-    static void PresentImage180(ANativeWindow_Buffer *buf, AImage *image);
-
-    static void PresentImage270(ANativeWindow_Buffer *buf, AImage *image);
-
     void WriteFile(AImage *image);
 };
 
