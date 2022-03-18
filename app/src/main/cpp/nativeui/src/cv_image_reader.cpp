@@ -106,15 +106,14 @@ ImageReader::ImageReader(ImageFormat *res, enum AIMAGE_FORMATS format)
     callback_ = nullptr;
     callbackCtx_ = nullptr;
 
-    media_status_t status = AImageReader_new(
-            res->width, res->height, format, MAX_BUF_COUNT, &reader_);
-    ASSERT(reader_ && status == AMEDIA_OK, "Failed to create AImageReader");
+    CALL_IMAGEREADER(new(res->width, res->height, format, MAX_BUF_COUNT, &reader_));
+    ASSERT(reader_, "Failed to create AImageReader");
 
     AImageReader_ImageListener listener{
             .context = this,
             .onImageAvailable = OnImageCallback,
     };
-    AImageReader_setImageListener(reader_, &listener);
+    CALL_IMAGEREADER(setImageListener(reader_, &listener));
 }
 
 ImageReader::~ImageReader() {
@@ -130,17 +129,11 @@ void ImageReader::RegisterCallback(
 
 void ImageReader::ImageCallback(AImageReader *reader) {
     int32_t format;
-    {
-        media_status_t status = AImageReader_getFormat(reader, &format);
-        ASSERT(status == AMEDIA_OK, "Failed to get the media format");
-    }
+    CALL_IMAGEREADER(getFormat(reader, &format));
 
     if (format == AIMAGE_FORMAT_JPEG) {
         AImage *image = nullptr;
-        {
-            media_status_t status = AImageReader_acquireNextImage(reader, &image);
-            ASSERT(status == AMEDIA_OK && image, "Image is not available");
-        }
+        CALL_IMAGEREADER(acquireNextImage(reader, &image));
 
         // Create a thread and write out the jpeg files
         std::thread writeFileHandler(&ImageReader::WriteFile, this, std::make_unique<Image>(image));

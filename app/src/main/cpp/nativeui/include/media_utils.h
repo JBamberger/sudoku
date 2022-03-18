@@ -15,6 +15,7 @@
            __FUNCTION__, status, GetErrorStr(status));               \
   }
 #define CALL_IMAGE(func) CALL_MEDIA(AImage_##func)
+#define CALL_IMAGEREADER(func) CALL_MEDIA(AImageReader_##func)
 
 const char *GetErrorStr(media_status_t err);
 
