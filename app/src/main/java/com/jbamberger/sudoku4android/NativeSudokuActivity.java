@@ -42,7 +42,7 @@ public class NativeSudokuActivity extends NativeActivity
     private static final int PERMISSION_REQUEST_CODE_CAMERA = 1;
 
     static {
-        System.loadLibrary("nativeui");
+        System.loadLibrary("sudoku_android_app");
     }
 
     volatile NativeSudokuActivity _savedInstance;

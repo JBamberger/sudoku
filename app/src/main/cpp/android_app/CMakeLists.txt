@@ -23,7 +23,7 @@ target_include_directories(native_app_glue PUBLIC
 # Export ANativeActivity_onCreate() (see https://github.com/android-ndk/ndk/issues/381)
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate")
 
-add_library(nativeui SHARED
+add_library(sudoku_android_app SHARED
         src/android_main.cpp
         src/sudoku_application.cpp
         src/sudoku_application_jni.cpp
@@ -32,7 +32,7 @@ add_library(nativeui SHARED
         src/camera_listeners.cpp
         src/camera_utils.cpp
         src/media_utils.cpp)
-target_link_libraries(nativeui
+target_link_libraries(sudoku_android_app
         android
         log
         m
@@ -42,11 +42,9 @@ target_link_libraries(nativeui
         ${OpenCV_LIBRARIES}
         sudoku_utils
         sudoku_detector
-        digit_classifier
-)
-target_include_directories(nativeui PRIVATE
+        digit_classifier)
+target_include_directories(sudoku_android_app PRIVATE
         include
         sudoku_utils
         sudoku_detector
-        digit_classifier
-)
+        digit_classifier)

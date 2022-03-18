@@ -1,9 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
 
-#if (DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
-#    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
-#endif ()
-
 project(sudoku_app CXX)
 set(CMAKE_CXX_STANDARD 17)
 
@@ -27,5 +23,4 @@ add_subdirectory(util)
 add_subdirectory(detector)
 add_subdirectory(classifier)
 add_subdirectory(solver)
-add_subdirectory(app)
 add_subdirectory(detection_benchmark)

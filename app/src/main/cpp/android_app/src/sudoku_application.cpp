@@ -143,31 +143,46 @@ void SudokuApplication::pollAndDrawFrame() {
         return;
     }
 
-    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+    using tp = std::chrono::steady_clock::time_point;
+
+    tp beginDisplay = std::chrono::steady_clock::now();
 
     // Converts YUV to RGBA8888 and outputs the image in the preview buffer
     yuvReader_->DisplayImage(&buf, std::move(image));
 
-    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-    LOGI("DisplayImage time: %8.04fms",
-         (std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()) / 1000.0);
+    tp endDisplay = std::chrono::steady_clock::now();
+
 
 
     // Wrap output buffer with cv::Mat to allow access from OpenCV
     auto display_mat = cv::Mat(buf.height, buf.stride, CV_8UC4, buf.bits);
 
-//    cv::circle(display_mat, {100, 100}, 100, {0, 255, 0}, 5);
-
     if (!sudokuDetector) {
         sudokuDetector = std::make_unique<SudokuDetector>(jniGetModelPath());
     }
 
-    // TODO: perform cv processing
+    tp beginDet = std::chrono::steady_clock::now();
 
-//    const auto detection = sudokuDetector->detect(display_mat);
-//    if (detection->foundSudoku) {
-//        detection->drawOverlay(display_mat);
-//    }
+    const auto detection = sudokuDetector->detect(display_mat);
+
+    tp beginDraw = std::chrono::steady_clock::now();
+
+    if (detection->foundSudoku) {
+        detection->drawOverlay(display_mat);
+    }
+
+    tp end = std::chrono::steady_clock::now();
+
+    auto deltaMs = [](tp begin, tp end) {
+        auto delta = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
+        return static_cast<double>(delta) / 1000.0;
+    };
+
+    LOGI("YUV->RGB: %7.02fms,\tdetect: %7.02fms,\tdraw: %7.02fms",
+         deltaMs(beginDisplay, endDisplay),
+         deltaMs(beginDet, beginDraw),
+         deltaMs(beginDraw, end)
+    );
 
 
     ANativeWindow_unlockAndPost(app_->window);
