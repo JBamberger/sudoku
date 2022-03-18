@@ -42,5 +42,8 @@ macro(package_add_test_with_libraries TESTNAME FILES LIBRARIES TEST_WORKING_DIRE
     set_target_properties(${TESTNAME} PROPERTIES FOLDER tests)
 endmacro()
 
-package_add_test(test1 test1.cpp)
-package_add_test_with_libraries(test2 solverTest.cpp sudoku_solver "${PROJECT_SOURCE_DIR}")
+add_library(test_helper src/test_helper.cpp)
+target_include_directories(test_helper PUBLIC sudoku_solver include)
+target_link_libraries(test_helper PUBLIC sudoku_solver)
+
+package_add_test_with_libraries(test-sudoku-solver src/solverTest.cpp test_helper "${PROJECT_SOURCE_DIR}")
