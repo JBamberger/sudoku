@@ -30,7 +30,8 @@ add_library(nativeui SHARED
         src/cv_image_reader.cpp
         src/camera_manager.cpp
         src/camera_listeners.cpp
-        src/camera_utils.cpp)
+        src/camera_utils.cpp
+        src/media_utils.cpp)
 target_link_libraries(nativeui
         android
         log

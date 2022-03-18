@@ -27,6 +27,7 @@
 #include <opencv2/imgproc.hpp>
 #include "image_reader.h"
 #include "native_debug.h"
+#include "media_utils.h"
 
 /*
  * For JPEG capture, captured files are saved under
@@ -68,35 +69,35 @@ Image::~Image() {
 
 cv::Rect Image::cropRect() const {
     AImageCropRect srcRect;
-    AImage_getCropRect(image_, &srcRect);
+    CALL_IMAGE(getCropRect(image_, &srcRect));
     return cv::Rect(cv::Point(srcRect.left, srcRect.top),
                     cv::Point(srcRect.right, srcRect.bottom));
 }
 
 int32_t Image::getFormat() const {
     int32_t srcFormat = -1;
-    AImage_getFormat(image_, &srcFormat);
+    CALL_IMAGE(getFormat(image_, &srcFormat));
     return srcFormat;
 }
 
 int32_t Image::getNumPlanes() const {
     int32_t numPlanes = 0;
-    AImage_getNumberOfPlanes(image_, &numPlanes);
+    CALL_IMAGE(getNumberOfPlanes(image_, &numPlanes));
     return numPlanes;
 }
 
 cv::Size Image::size() const {
     int32_t h = -1, w = -1;
-    AImage_getWidth(image_, &h);
-    AImage_getWidth(image_, &w);
+    CALL_IMAGE(getWidth(image_, &h));
+    CALL_IMAGE(getWidth(image_, &w));
     return cv::Size(w, h);
 }
 
 ImagePlane Image::getImagePlane(int planeIdx) const {
     ImagePlane plane{};
-    AImage_getPlaneData(image_, planeIdx, &plane.data, &plane.length);
-    AImage_getPlaneRowStride(image_, planeIdx, &plane.rowStride);
-    AImage_getPlanePixelStride(image_, planeIdx, &plane.pixelStride);
+    CALL_IMAGE(getPlaneData(image_, planeIdx, &plane.data, &plane.length));
+    CALL_IMAGE(getPlaneRowStride(image_, planeIdx, &plane.rowStride));
+    CALL_IMAGE(getPlanePixelStride(image_, planeIdx, &plane.pixelStride));
     return plane;
 }
 
@@ -142,7 +143,7 @@ void ImageReader::ImageCallback(AImageReader *reader) {
         }
 
         // Create a thread and write out the jpeg files
-        std::thread writeFileHandler(&ImageReader::WriteFile, this, image);
+        std::thread writeFileHandler(&ImageReader::WriteFile, this, std::make_unique<Image>(image));
         writeFileHandler.detach();
     }
 }
@@ -239,7 +240,7 @@ bool ImageReader::DisplayImage(ANativeWindow_Buffer *buf, std::unique_ptr<Image>
 
         cv::cvtColor(yuvMat, rgbNoRot, cv::COLOR_YUV2RGBA_I420);
     } else if (uPlane.pixelStride == 2) { // Chroma channels are interleaved
-        cv::Mat yMat(imgSize.height, imgSize.width, CV_8UC1, yPlane.data , yPlane.rowStride);
+        cv::Mat yMat(imgSize.height, imgSize.width, CV_8UC1, yPlane.data, yPlane.rowStride);
         yMat = yMat(yRect);
 
         long addrDiff = vPlane.data - uPlane.data;
@@ -291,20 +292,11 @@ void ImageReader::SetPresentRotation(int32_t angle) {
     presentRotation_ = angle;
 }
 
-/**
- * Write out jpeg files to kDirName directory
- * @param image point capture jpg image
- */
-void ImageReader::WriteFile(AImage *image) {
+void ImageReader::WriteFile(std::unique_ptr<Image> image) {
+    auto planeCount = image->getNumPlanes();
+    ASSERT(planeCount == 1, "Error: getNumberOfPlanes() planeCount = %d", planeCount);
 
-    int planeCount;
-    media_status_t status = AImage_getNumberOfPlanes(image, &planeCount);
-    ASSERT(status == AMEDIA_OK && planeCount == 1,
-           "Error: getNumberOfPlanes() planeCount = %d", planeCount);
-
-    uint8_t *data = nullptr;
-    int len = 0;
-    AImage_getPlaneData(image, 0, &data, &len);
+    auto plane = image->getImagePlane(0);
 
     DIR *dir = opendir(kDirName);
     if (dir) {
@@ -328,8 +320,8 @@ void ImageReader::WriteFile(AImage *image) {
                 std::to_string(localTime.tm_min) +
                 std::to_string(localTime.tm_sec) + ".jpg";
     FILE *file = fopen(fileName.c_str(), "wb");
-    if (file && data && len) {
-        fwrite(data, 1, len, file);
+    if (file && plane.data && plane.length) {
+        fwrite(plane.data, 1, plane.length, file);
         fclose(file);
 
         if (callback_) {
@@ -339,5 +331,4 @@ void ImageReader::WriteFile(AImage *image) {
         if (file)
             fclose(file);
     }
-    AImage_delete(image);
 }

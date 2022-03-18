@@ -122,7 +122,7 @@ private:
     std::function<void(void *ctx, const char *fileName)> callback_;
     void *callbackCtx_;
 
-    void WriteFile(AImage *image);
+    void WriteFile(std::unique_ptr<Image> image);
 };
 
 #endif  // CAMERA_IMAGE_READER_H
