@@ -247,11 +247,11 @@ bool ImageReader::DisplayImage(ANativeWindow_Buffer *buf, std::unique_ptr<Image>
         if (addrDiff == 1) {
             cv::Mat uvMat(
                     imgSize.height / 2, imgSize.width / 2, CV_8UC2, uPlane.data, uPlane.rowStride);
-            cv::cvtColorTwoPlane(yMat, uvMat(uvRect), rgbNoRot, cv::COLOR_YUV2RGBA_NV21);
+            cv::cvtColorTwoPlane(yMat, uvMat(uvRect), rgbNoRot, cv::COLOR_YUV2RGBA_NV12);
         } else if (addrDiff == -1) {
             cv::Mat uvMat(
                     imgSize.height / 2, imgSize.width / 2, CV_8UC2, vPlane.data, vPlane.rowStride);
-            cv::cvtColorTwoPlane(yMat, uvMat(uvRect), rgbNoRot, cv::COLOR_YUV2RGBA_NV12);
+            cv::cvtColorTwoPlane(yMat, uvMat(uvRect), rgbNoRot, cv::COLOR_YUV2RGBA_NV21);
         } else {
             // TODO: Implement handling for interleaved data that does not share the same memory
             //  location.
