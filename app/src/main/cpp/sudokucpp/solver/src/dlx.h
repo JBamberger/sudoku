@@ -20,9 +20,16 @@ struct DlxConstraintMatrix
     {}
 };
 
+/**
+ * DLX implementation of Algorithm X (c.f. https://arxiv.org/abs/cs/0011047)
+ *
+ * The algorithm solves the Exact Cover Problem:
+ * Selects a subset of rows from a binary matrix such that each columns contains
+ * exactly a single 1.
+ */
 class DlxSolver
 {
-    struct Impl;
+    class Impl;
     std::unique_ptr<Impl> impl;
 
   public:

@@ -21,39 +21,15 @@ struct DataNode
     DataNode* down;
     ColumnNode* column;
 
-    explicit DataNode()
-      : DataNode(nullptr)
-    {}
-
-    explicit DataNode(ColumnNode* column)
-      : left(this)
-      , right(this)
-      , up(this)
-      , down(this)
-      , column(column)
-    {}
-
+    explicit DataNode();
+    explicit DataNode(ColumnNode* column);
     virtual ~DataNode() = default;
 
     void cover();
-
     void uncover();
 
-    void insertBelow(DataNode* node)
-    {
-        node->down = this->down;
-        node->down->up = node;
-        node->up = this;
-        this->down = node;
-    }
-
-    void insertRight(DataNode* node)
-    {
-        node->right = this->right;
-        node->right->left = node;
-        node->left = this;
-        this->right = node;
-    }
+    void insertBelow(DataNode* node);
+    void insertRight(DataNode* node);
 };
 
 struct ColumnNode : public DataNode
@@ -67,6 +43,44 @@ struct ColumnNode : public DataNode
       , index(0)
     {}
 };
+
+class DlxSolver::Impl
+{
+    std::unique_ptr<DataNode> headPtr = nullptr;
+    DataNode* head = nullptr;
+    std::vector<ColumnNode> colNodes;
+    std::vector<DataNode> dataNodes;
+    std::vector<DataNode*> solution;
+    size_t numCols = 0;
+
+    void setup(const DlxConstraintMatrix& constraintMatrix);
+    void teardown();
+    std::unique_ptr<DlxConstraintMatrix> decodeSolution();
+    [[nodiscard]] ColumnNode* selectColumn() const;
+    std::unique_ptr<DlxConstraintMatrix> search(int k);
+    void searchAll(int k, const std::function<void(std::unique_ptr<DlxConstraintMatrix>)>& resultCollector);
+
+  public:
+    std::unique_ptr<DlxConstraintMatrix> solve(const DlxConstraintMatrix& constraintMatrix);
+    void solveAll(const DlxConstraintMatrix& constraintMatrix,
+                  const std::function<void(std::unique_ptr<DlxConstraintMatrix>)>& resultCollector);
+};
+
+//*****************************************************************************
+// DataNode
+//*****************************************************************************
+
+DataNode::DataNode()
+  : DataNode(nullptr)
+{}
+
+DataNode::DataNode(ColumnNode* column)
+  : left(this)
+  , right(this)
+  , up(this)
+  , down(this)
+  , column(column)
+{}
 
 void
 DataNode::cover()
@@ -98,183 +112,206 @@ DataNode::uncover()
     this->left->right = this;
 }
 
-struct DlxSolver::Impl
+void
+DataNode::insertBelow(DataNode* node)
 {
-    std::unique_ptr<DataNode> headPtr = nullptr;
-    DataNode* head = nullptr;
-    std::vector<ColumnNode> colNodes;
-    std::vector<DataNode> dataNodes;
+    node->down = this->down;
+    node->down->up = node;
+    node->up = this;
+    this->down = node;
+}
 
-    std::vector<DataNode*> solution;
-    size_t numCols = 0;
+void
+DataNode::insertRight(DataNode* node)
+{
+    node->right = this->right;
+    node->right->left = node;
+    node->left = this;
+    this->right = node;
+}
 
-    std::unique_ptr<DlxConstraintMatrix> solve(const DlxConstraintMatrix& constraintMatrix)
-    {
-        setup(constraintMatrix);
-        auto result = search(0);
-        teardown();
+//*****************************************************************************
+// DlxSolver::Impl
+//*****************************************************************************
 
-        return result;
+std::unique_ptr<DlxConstraintMatrix>
+DlxSolver::Impl::solve(const DlxConstraintMatrix& constraintMatrix)
+{
+    setup(constraintMatrix);
+    auto result = search(0);
+    teardown();
+
+    return result;
+}
+
+void
+DlxSolver::Impl::solveAll(const DlxConstraintMatrix& constraintMatrix,
+                          const std::function<void(std::unique_ptr<DlxConstraintMatrix>)>& resultCollector)
+{
+    setup(constraintMatrix);
+    searchAll(0, resultCollector);
+    teardown();
+}
+
+void
+DlxSolver::Impl::setup(const DlxConstraintMatrix& constraintMatrix)
+{
+    numCols = constraintMatrix.numCols;
+
+    headPtr = std::make_unique<DataNode>();
+    head = headPtr.get();
+
+    colNodes = std::vector<ColumnNode>(numCols);
+
+    // Create column nodes
+    for (size_t i = 0; i < numCols; i++) {
+        ColumnNode* col = &colNodes.at(i);
+        col->index = i;
+
+        // head->left is the last/rightmost node in the list because the lists are circular
+        head->left->insertRight(col);
     }
 
-    void solveAll(const DlxConstraintMatrix& constraintMatrix,
-                  const std::function<void(std::unique_ptr<DlxConstraintMatrix>)>& resultCollector)
-    {
-        setup(constraintMatrix);
-        searchAll(0, resultCollector);
-        teardown();
+    size_t numConstraints = 0;
+    for (const auto& row : constraintMatrix.constraints) {
+        numConstraints += row.size();
     }
+    dataNodes = std::vector<DataNode>(numConstraints);
+    size_t nextNode = 0;
+    for (const auto& row : constraintMatrix.constraints) {
+        DataNode* prev = nullptr;
+        for (size_t colIndex : row) {
+            auto col = &colNodes[colIndex];
+            auto n = &dataNodes[nextNode++];
+            n->column = col;
 
-    void setup(const DlxConstraintMatrix& constraintMatrix)
-    {
-        numCols = constraintMatrix.numCols;
+            // col->up is the last node in vertical direction for this column
+            col->up->insertBelow(n);
+            col->size += 1;
 
-        headPtr = std::make_unique<DataNode>();
-        head = headPtr.get();
-
-        colNodes = std::vector<ColumnNode>(numCols);
-
-        // Create column nodes
-        for (size_t i = 0; i < numCols; i++) {
-            ColumnNode* col = &colNodes.at(i);
-            col->index = i;
-
-            // head->left is the last/rightmost node in the list because the lists are circular
-            head->left->insertRight(col);
-        }
-
-        size_t numConstraints = 0;
-        for (const auto& row : constraintMatrix.constraints) {
-            numConstraints += row.size();
-        }
-        dataNodes = std::vector<DataNode>(numConstraints);
-        size_t nextNode = 0;
-        for (const auto& row : constraintMatrix.constraints) {
-            DataNode* prev = nullptr;
-            for (size_t colIndex : row) {
-                auto col = &colNodes[colIndex];
-                auto n = &dataNodes[nextNode++];
-                n->column = col;
-
-                // col->up is the last node in vertical direction for this column
-                col->up->insertBelow(n);
-                col->size += 1;
-
-                if (prev == nullptr) {
-                    prev = n;
-                } else {
-                    prev->insertRight(n);
-                }
+            if (prev == nullptr) {
+                prev = n;
+            } else {
+                prev->insertRight(n);
             }
         }
     }
+}
 
-    void teardown()
-    {
-        dataNodes.clear();
-        colNodes.clear();
-        solution.clear();
-        headPtr = nullptr;
-        head = nullptr;
-        numCols = 0;
+void
+DlxSolver::Impl::teardown()
+{
+    dataNodes.clear();
+    colNodes.clear();
+    solution.clear();
+    headPtr = nullptr;
+    head = nullptr;
+    numCols = 0;
+}
+
+std::unique_ptr<DlxConstraintMatrix>
+DlxSolver::Impl::decodeSolution()
+{
+    auto result = std::make_unique<DlxConstraintMatrix>(0, numCols);
+    result->constraints.reserve(solution.size());
+    for (auto node : solution) {
+        std::vector<size_t> ones;
+
+        auto i = node;
+        do {
+            ones.push_back(i->column->index);
+            i = i->right;
+        } while (i != node);
+
+        std::sort(std::begin(ones), std::end(ones));
+
+        result->constraints.push_back(ones);
     }
 
-    std::unique_ptr<DlxConstraintMatrix> decodeSolution()
-    {
-        auto result = std::make_unique<DlxConstraintMatrix>(0, numCols);
-        result->constraints.reserve(solution.size());
-        for (auto node : solution) {
-            std::vector<size_t> ones;
+    return result;
+}
 
-            auto i = node;
-            do {
-                ones.push_back(i->column->index);
-                i = i->right;
-            } while (i != node);
-
-            std::sort(std::begin(ones), std::end(ones));
-
-            result->constraints.push_back(ones);
+ColumnNode*
+DlxSolver::Impl::selectColumn() const
+{
+    auto* best = dynamic_cast<ColumnNode*>(head->right);
+    for (auto j = head->right; head != j; j = j->right) {
+        auto k = dynamic_cast<ColumnNode*>(j);
+        if (k->size < best->size) {
+            best = k;
         }
+    }
+    return best;
+}
 
-        return result;
+std::unique_ptr<DlxConstraintMatrix>
+DlxSolver::Impl::search(int k)
+{
+
+    if (head == head->right) {
+        return decodeSolution();
     }
 
-    [[nodiscard]] ColumnNode* selectColumn() const
-    {
-        auto* best = dynamic_cast<ColumnNode*>(head->right);
-        for (auto j = head->right; head != j; j = j->right) {
-            auto k = dynamic_cast<ColumnNode*>(j);
-            if (k->size < best->size) {
-                best = k;
-            }
+    auto c = selectColumn();
+    c->cover();
+
+    for (auto r = c->down; r != c; r = r->down) {
+        solution.push_back(r);
+
+        for (auto j = r->right; j != r; j = j->right) {
+            j->column->cover();
         }
-        return best;
+
+        auto result = search(k + 1);
+        if (result != nullptr) {
+            return result;
+        }
+
+        r = solution.back();
+        solution.pop_back();
+        c = r->column;
+
+        for (auto j = r->left; j != r; j = j->left) {
+            j->column->uncover();
+        }
+    }
+    c->uncover();
+
+    return nullptr;
+}
+
+void
+DlxSolver::Impl::searchAll(int k, const std::function<void(std::unique_ptr<DlxConstraintMatrix>)>& resultCollector)
+{
+    if (head == head->right) {
+        resultCollector(decodeSolution());
     }
 
-    std::unique_ptr<DlxConstraintMatrix> search(int k)
-    {
+    auto c = selectColumn();
+    c->cover();
 
-        if (head == head->right) {
-            return decodeSolution();
+    for (auto r = c->down; r != c; r = r->down) {
+        solution.push_back(r);
+
+        for (auto j = r->right; j != r; j = j->right) {
+            j->column->cover();
         }
+        searchAll(k + 1, resultCollector);
 
-        auto c = selectColumn();
-        c->cover();
+        r = solution.back();
+        solution.pop_back();
+        c = r->column;
 
-        for (auto r = c->down; r != c; r = r->down) {
-            solution.push_back(r);
-
-            for (auto j = r->right; j != r; j = j->right) {
-                j->column->cover();
-            }
-
-            auto result = search(k + 1);
-            if (result != nullptr) {
-                return result;
-            }
-
-            r = solution.back();
-            solution.pop_back();
-            c = r->column;
-
-            for (auto j = r->left; j != r; j = j->left) {
-                j->column->uncover();
-            }
+        for (auto j = r->left; j != r; j = j->left) {
+            j->column->uncover();
         }
-        c->uncover();
-
-        return nullptr;
     }
+    c->uncover();
+}
 
-    void searchAll(int k, const std::function<void(std::unique_ptr<DlxConstraintMatrix>)>& resultCollector)
-    {
-        if (head == head->right) {
-            resultCollector(decodeSolution());
-        }
-
-        auto c = selectColumn();
-        c->cover();
-
-        for (auto r = c->down; r != c; r = r->down) {
-            solution.push_back(r);
-
-            for (auto j = r->right; j != r; j = j->right) {
-                j->column->cover();
-            }
-            searchAll(k + 1, resultCollector);
-
-            r = solution.back();
-            solution.pop_back();
-            c = r->column;
-
-            for (auto j = r->left; j != r; j = j->left) {
-                j->column->uncover();
-            }
-        }
-        c->uncover();
-    }
-};
+//*****************************************************************************
+// DlxSolver
+//*****************************************************************************
 
 DlxSolver::DlxSolver()
   : impl(std::make_unique<Impl>())
