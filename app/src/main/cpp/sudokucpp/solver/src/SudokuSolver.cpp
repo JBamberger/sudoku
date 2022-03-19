@@ -327,26 +327,3 @@ SudokuSolver::create(SolverType type)
             throw std::runtime_error("Invalid solver type.");
     }
 }
-
-// int
-// main()
-//{
-//     std::string sudokuString = "4.....8.5.3..........7......2.....6.....8.4......1.......6.3.7.5..2.....1.4......";
-//     SudokuGrid grid{};
-//     for (int i = 0; i < 81; i++) {
-//         char cellValue = sudokuString.at(i);
-//         grid[i] = cellValue == '.' ? 0 : cellValue - '0';
-//     }
-//
-//     auto solver = SudokuSolver::create(SolverType::Dlx);
-//     auto solution = solver->solve(grid);
-//
-//     if (solution == nullptr) {
-//         std::cerr << "Could not find any solutions to the sudoku." << std::endl;
-//     } else {
-//         for (int i = 0; i < 81; i++) {
-//             std::cout << (*solution)[i];
-//         }
-//         std::cout << std::endl;
-//     }
-// }

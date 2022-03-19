@@ -21,6 +21,10 @@ struct DataNode
     DataNode* down;
     ColumnNode* column;
 
+    explicit DataNode()
+      : DataNode(nullptr)
+    {}
+
     explicit DataNode(ColumnNode* column)
       : left(this)
       , right(this)
@@ -57,10 +61,10 @@ struct ColumnNode : public DataNode
     size_t size;
     size_t index;
 
-    explicit ColumnNode(size_t index)
+    explicit ColumnNode()
       : DataNode(this)
       , size(0)
-      , index(index)
+      , index(0)
     {}
 };
 
@@ -96,9 +100,12 @@ DataNode::uncover()
 
 struct DlxSolver::Impl
 {
-    std::vector<std::unique_ptr<DataNode>> nodes;
-    std::vector<DataNode*> solution;
+    std::unique_ptr<DataNode> headPtr = nullptr;
     DataNode* head = nullptr;
+    std::vector<ColumnNode> colNodes;
+    std::vector<DataNode> dataNodes;
+
+    std::vector<DataNode*> solution;
     size_t numCols = 0;
 
     std::unique_ptr<DlxConstraintMatrix> solve(const DlxConstraintMatrix& constraintMatrix)
@@ -121,23 +128,34 @@ struct DlxSolver::Impl
     void setup(const DlxConstraintMatrix& constraintMatrix)
     {
         numCols = constraintMatrix.numCols;
-        head = createDataNode(nullptr);
+
+        headPtr = std::make_unique<DataNode>();
+        head = headPtr.get();
+
+        colNodes = std::vector<ColumnNode>(numCols);
 
         // Create column nodes
-        std::vector<ColumnNode*> columns;
-        columns.reserve(numCols);
         for (size_t i = 0; i < numCols; i++) {
-            auto col = createColNode(i);
+            ColumnNode* col = &colNodes.at(i);
+            col->index = i;
+
             // head->left is the last/rightmost node in the list because the lists are circular
             head->left->insertRight(col);
-            columns.push_back(col);
         }
 
+        size_t numConstraints = 0;
+        for (const auto& row : constraintMatrix.constraints) {
+            numConstraints += row.size();
+        }
+        dataNodes = std::vector<DataNode>(numConstraints);
+        size_t nextNode = 0;
         for (const auto& row : constraintMatrix.constraints) {
             DataNode* prev = nullptr;
             for (size_t colIndex : row) {
-                auto col = columns[colIndex];
-                auto n = createDataNode(col);
+                auto col = &colNodes[colIndex];
+                auto n = &dataNodes[nextNode++];
+                n->column = col;
+
                 // col->up is the last node in vertical direction for this column
                 col->up->insertBelow(n);
                 col->size += 1;
@@ -153,22 +171,12 @@ struct DlxSolver::Impl
 
     void teardown()
     {
-        nodes.clear();
+        dataNodes.clear();
+        colNodes.clear();
         solution.clear();
+        headPtr = nullptr;
         head = nullptr;
         numCols = 0;
-    }
-
-    DataNode* createDataNode(ColumnNode* column)
-    {
-        nodes.push_back(std::make_unique<DataNode>(column));
-        return nodes.back().get();
-    }
-
-    ColumnNode* createColNode(size_t index)
-    {
-        nodes.push_back(std::make_unique<ColumnNode>(index));
-        return dynamic_cast<ColumnNode*>(nodes.back().get());
     }
 
     std::unique_ptr<DlxConstraintMatrix> decodeSolution()
@@ -194,9 +202,6 @@ struct DlxSolver::Impl
 
     [[nodiscard]] ColumnNode* selectColumn() const
     {
-#ifdef USE_HEURISTIC
-        return dynamic_cast<ColumnNode*>(head->right);
-#else
         auto* best = dynamic_cast<ColumnNode*>(head->right);
         for (auto j = head->right; head != j; j = j->right) {
             auto k = dynamic_cast<ColumnNode*>(j);
@@ -205,7 +210,6 @@ struct DlxSolver::Impl
             }
         }
         return best;
-#endif
     }
 
     std::unique_ptr<DlxConstraintMatrix> search(int k)
@@ -271,18 +275,24 @@ struct DlxSolver::Impl
         c->uncover();
     }
 };
+
 DlxSolver::DlxSolver()
   : impl(std::make_unique<Impl>())
 {}
+
 DlxSolver::~DlxSolver() = default;
+
 DlxSolver::DlxSolver(DlxSolver&&) noexcept = default;
+
 DlxSolver&
 DlxSolver::operator=(DlxSolver&&) noexcept = default;
+
 std::unique_ptr<DlxConstraintMatrix>
 DlxSolver::solve(const DlxConstraintMatrix& constraintMatrix)
 {
     return impl->solve(constraintMatrix);
 }
+
 void
 DlxSolver::solve(const DlxConstraintMatrix& constraintMatrix,
                  const std::function<void(std::unique_ptr<DlxConstraintMatrix>)>& resultCollector)
