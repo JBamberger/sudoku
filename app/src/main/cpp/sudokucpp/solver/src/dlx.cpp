@@ -85,9 +85,13 @@ DataNode::DataNode(ColumnNode* column)
 void
 DataNode::cover()
 {
+    // Unhook this node laterally
     this->left->right = this->right;
     this->right->left = this->left;
 
+    // Unhook all nodes that are connected laterally to nodes in this column.
+    // This is equivalent to removing all rows from the matrix where a 1 is
+    // placed in the column of this node.
     for (auto i = this->down; i != this; i = i->down) {
         for (auto j = i->right; j != i; j = j->right) {
             j->up->down = j->down;
@@ -100,6 +104,7 @@ DataNode::cover()
 void
 DataNode::uncover()
 {
+    // Re-adds the nodes disconnected in DataNode::cover()
     for (auto i = this->up; i != this; i = i->up) {
         for (auto j = i->left; j != i; j = j->left) {
             j->column->size += 1;
@@ -247,34 +252,40 @@ DlxSolver::Impl::selectColumn() const
 std::unique_ptr<DlxConstraintMatrix>
 DlxSolver::Impl::search(int k)
 {
-
     if (head == head->right) {
+        // We've managed to reduce all columns, therefore satisfying all constraints with our selection.
         return decodeSolution();
     }
 
+    // There are columns left. Select one and remove it from the matrix.
     auto c = selectColumn();
     c->cover();
 
+    // Test each row affected by the selected column as part of the solution.
     for (auto r = c->down; r != c; r = r->down) {
+        // Use r as part of the current solution attempt
         solution.push_back(r);
-
+        // Remove all rows conflicting with the selected row.
         for (auto j = r->right; j != r; j = j->right) {
             j->column->cover();
         }
 
+        // Recursively, search for a solution in the reduced problem.
         auto result = search(k + 1);
         if (result != nullptr) {
             return result;
         }
 
-        r = solution.back();
-        solution.pop_back();
-        c = r->column;
-
+        // No solution was found in the recursive call chain. Restore the original state:
+        // Re-add the conflicting rows
         for (auto j = r->left; j != r; j = j->left) {
             j->column->uncover();
         }
+        // Remove the selected row from the solution
+        solution.pop_back();
     }
+    // We failed to satisfy the constraints with the current configuration,
+    // restore the previous state by re-adding the column and related rows.
     c->uncover();
 
     return nullptr;
@@ -285,6 +296,10 @@ DlxSolver::Impl::searchAll(int k, const std::function<void(std::unique_ptr<DlxCo
 {
     if (head == head->right) {
         resultCollector(decodeSolution());
+        // FIXME: Here should be a 'return', I believe. There are no columns
+        //  to select anyway so the loop would terminate immediately anyway as
+        //  its up and down links point to itself.
+        //  return;
     }
 
     auto c = selectColumn();
@@ -296,15 +311,13 @@ DlxSolver::Impl::searchAll(int k, const std::function<void(std::unique_ptr<DlxCo
         for (auto j = r->right; j != r; j = j->right) {
             j->column->cover();
         }
-        searchAll(k + 1, resultCollector);
 
-        r = solution.back();
-        solution.pop_back();
-        c = r->column;
+        searchAll(k + 1, resultCollector);
 
         for (auto j = r->left; j != r; j = j->left) {
             j->column->uncover();
         }
+        solution.pop_back();
     }
     c->uncover();
 }

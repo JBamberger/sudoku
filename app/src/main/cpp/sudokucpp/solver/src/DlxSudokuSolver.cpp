@@ -135,6 +135,7 @@ createSudokuECMatrix_v2(const SudokuGrid& sudoku)
         const size_t B = boxSide;
         const size_t NN = N * N;
         auto& constraint = matrix.constraints.at(NN * row + N * col + num);
+        constraint.reserve(4);
 
         // One number per cell
         constraint.emplace_back((N * row + col));
