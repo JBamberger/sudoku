@@ -1,11 +1,8 @@
 #include <cassert>
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 
 #include "test_helper.h"
-
-namespace fs = std::filesystem;
 
 SudokuChallenge::SudokuChallenge(const std::string& line)
   : grid{}

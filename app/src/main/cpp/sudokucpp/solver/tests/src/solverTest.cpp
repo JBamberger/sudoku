@@ -1,7 +1,5 @@
 #include "gtest/gtest.h"
 
-#include <cstdlib>
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -9,13 +7,19 @@
 #include <SudokuSolver.h>
 #include <test_helper.h>
 
-namespace fs = std::filesystem;
-
 namespace {
 
 void
-runTest(std::unique_ptr<SudokuSolver> solver, const std::string& path)
+runTest(SolverType solverType, const std::string& path)
 {
+    std::unique_ptr<SudokuSolver> solver;
+    try {
+        solver = SudokuSolver::create(solverType);
+    } catch (const std::runtime_error& e) {
+        FAIL();
+        return;
+    }
+
     const auto challenges = readSudokuChallenges(path);
 
     for (const auto& challenge : challenges) {
@@ -39,31 +43,31 @@ runTest(std::unique_ptr<SudokuSolver> solver, const std::string& path)
 
 TEST(solver, test_test_sudokus)
 {
-    runTest(SudokuSolver::create(SolverType::Dlx), "./solver/tests/test_sudokus.txt");
+    runTest(SolverType::Dlx, "./solver/tests/test_sudokus.txt");
 }
 
 TEST(solver, test_any_sudokus)
 {
-    runTest(SudokuSolver::create(SolverType::Dlx), "./solver/tests/any.txt");
+    runTest(SolverType::Dlx, "./solver/tests/any.txt");
 }
 
 TEST(solver, test_simple_sudokus)
 {
-    runTest(SudokuSolver::create(SolverType::Dlx), "./solver/tests/simple.txt");
+    runTest(SolverType::Dlx, "./solver/tests/simple.txt");
 }
 
 TEST(solver, test_easy_sudokus)
 {
-    runTest(SudokuSolver::create(SolverType::Dlx), "./solver/tests/easy.txt");
+    runTest(SolverType::Dlx, "./solver/tests/easy.txt");
 }
 
 TEST(solver, test_intermediate_sudokus)
 {
-    runTest(SudokuSolver::create(SolverType::Dlx), "./solver/tests/intermediate.txt");
+    runTest(SolverType::Dlx, "./solver/tests/intermediate.txt");
 }
 
 TEST(solver, test_expert_sudokus)
 {
-    runTest(SudokuSolver::create(SolverType::Dlx), "./solver/tests/expert.txt");
+    runTest(SolverType::Dlx, "./solver/tests/expert.txt");
 }
 }
