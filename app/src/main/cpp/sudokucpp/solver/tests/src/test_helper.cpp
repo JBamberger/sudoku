@@ -24,7 +24,7 @@ SudokuChallenge::SudokuChallenge(const std::string& line)
 bool
 SudokuChallenge::isValidSolution(const SudokuGrid* result, int* errorCount) const
 {
-    if (result->size() != solution.size()) {
+    if (!result || result->size() != solution.size()) {
         *errorCount = -1;
         return false;
     }

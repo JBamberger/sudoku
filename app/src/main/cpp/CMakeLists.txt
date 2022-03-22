@@ -3,6 +3,7 @@ project(sudokucpp)
 
 set(CMAKE_CXX_STANDARD 17)
 
+find_package(fmt)
 find_package(OpenCV 4.5 REQUIRED core imgcodecs imgproc highgui videoio dnn)
 find_library(log-lib log)
 
