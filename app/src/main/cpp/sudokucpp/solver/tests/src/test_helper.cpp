@@ -5,18 +5,18 @@
 #include "test_helper.h"
 
 SudokuChallenge::SudokuChallenge(const std::string& line)
-  : grid{}
-  , solution{}
+  : grid(9)
+  , solution(9)
 {
-    assert(line.size() == 2 * 81 + 1);
+    assert(line.size() == 2 * grid.size() + 1);
 
-    for (int i = 0; i < 81; i++) {
+    for (int i = 0; i < grid.size(); i++) {
         char cellValue = line.at(i);
         grid[i] = cellValue == '.' ? 0 : cellValue - '0';
     }
 
-    for (int i = 0; i < 81; i++) {
-        char cellValue = line.at(82 + i); // offset by 81 for sudoku and 1 for ';' divider
+    for (int i = 0; i < grid.size(); i++) {
+        char cellValue = line.at(grid.size() + 1 + i); // offset by 81 for sudoku and 1 for ';' divider
         solution[i] = cellValue - '0';
     }
 }

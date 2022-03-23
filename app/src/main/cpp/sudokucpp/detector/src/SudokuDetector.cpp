@@ -43,7 +43,20 @@ struct SudokuDetector::Impl
 
         if (detection->foundAllCells) {
             auto solver = SudokuSolver::create(SolverType::Dlx);
-            detection->solution = solver->solve(detection->cellLabels);
+
+            SudokuGrid grid(9);
+            for (int i = 0; i < 81; i++) {
+                grid.at(i) = detection->cellLabels[i];
+            }
+            auto solvedGrid = solver->solve(grid);
+            if (solvedGrid) {
+                detection->solution = std::make_unique<std::array<int, 81>>();
+                for (int i = 0; i < 81; i++) {
+                    detection->solution->at(i) = solvedGrid->at(i);
+                }
+            } else {
+                detection->solution = nullptr;
+            }
         }
 
         return detection;

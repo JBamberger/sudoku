@@ -70,4 +70,34 @@ TEST(solver, test_expert_sudokus)
 {
     runTest(SolverType::Dlx, "./solver/tests/expert.txt");
 }
+
+TEST(solver, test_test_sudokus_constraint)
+{
+    runTest(SolverType::Constraint, "./solver/tests/test_sudokus.txt");
+}
+
+TEST(solver, test_any_sudokus_constraint)
+{
+    runTest(SolverType::Constraint, "./solver/tests/any.txt");
+}
+
+TEST(solver, test_simple_sudokus_constraint)
+{
+    runTest(SolverType::Constraint, "./solver/tests/simple.txt");
+}
+
+TEST(solver, test_easy_sudokus_constraint)
+{
+    runTest(SolverType::Constraint, "./solver/tests/easy.txt");
+}
+
+TEST(solver, test_intermediate_sudokus_constraint)
+{
+    runTest(SolverType::Constraint, "./solver/tests/intermediate.txt");
+}
+
+TEST(solver, test_expert_sudokus_constraint)
+{
+    runTest(SolverType::Constraint, "./solver/tests/expert.txt");
+}
 }

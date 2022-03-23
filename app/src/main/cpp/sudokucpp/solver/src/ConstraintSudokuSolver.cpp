@@ -1,6 +1,8 @@
 
+#include <array>
 #include <iostream>
 #include <numeric>
+#include <utility>
 #include <vector>
 
 #include "ConstraintSudokuSolver.h"
@@ -13,100 +15,89 @@ enum class ConstraintSolverState
     UNSOLVABLE
 };
 
-struct ConstraintSolverSudoku
+std::vector<int>
+getCellPossibilities(const SudokuGrid& grid, int row, int col)
 {
-    static constexpr int BOX_SIZE = 3;
-    static constexpr int SIZE = 9;
-    static constexpr int NUM_CELLS = 81;
+    std::vector<bool> candidates(grid.sideLen + 1);
+    std::fill(std::begin(candidates), std::end(candidates), true);
 
-    SudokuGrid grid;
-
-    static int from2d(int row, int col) { return row * SIZE + col; }
-
-    static std::tuple<int, int> boxCoordinates(int row, int col)
-    {
-        return std::make_tuple(row / BOX_SIZE, col / BOX_SIZE);
+    // check row
+    for (int i = 0; i < grid.sideLen; i++) {
+        candidates.at(grid.at(i, col)) = false;
     }
 
-    explicit ConstraintSolverSudoku(const SudokuGrid& grid)
-      : grid(grid)
-    {}
-
-    int& at(int row, int col) { return grid[from2d(row, col)]; }
-
-    bool isCellFilled(int row, int col) { return at(row, col) > 0; }
-
-    std::vector<int> getCellPossibilities(int row, int col)
-    {
-        std::array<bool, SIZE + 1> candidates{};
-        std::fill(std::begin(candidates), std::end(candidates), true);
-
-        // check row
-        for (int i = 0; i < SIZE; i++) {
-            candidates[at(i, col)] = false;
-        }
-
-        // check col
-        for (int i = 0; i < SIZE; i++) {
-            candidates[at(row, i)] = false;
-        }
-
-        // check box
-        auto [boxRow, boxCol] = boxCoordinates(row, col);
-        for (int i = boxRow * BOX_SIZE; i < boxRow * BOX_SIZE + BOX_SIZE; i++) {
-            for (int j = boxCol * BOX_SIZE; j < boxCol * BOX_SIZE + BOX_SIZE; j++) {
-                candidates[at(i, j)] = false;
-            }
-        }
-
-        std::vector<int> numbers;
-        for (int num = 1; num <= SIZE; num++) {
-            if (candidates[num]) {
-                numbers.push_back(num);
-            }
-        }
-
-        return numbers;
+    // check col
+    for (int i = 0; i < grid.sideLen; i++) {
+        candidates.at(grid.at(row, i)) = false;
     }
 
-    ConstraintSolverState solveTrivial()
-    {
-        bool solved = true;
-        for (int row = 0; row < SIZE; row++) {
-            for (int col = 0; col < SIZE; col++) {
-                if (isCellFilled(row, col)) {
-                    // Cell is already filled. No further checks necessary.
-                    continue;
-                }
-                solved = false;
-                auto candidates = getCellPossibilities(row, col);
-
-                if (candidates.size() == 1) {
-                    grid[from2d(row, col)] = candidates.front();
-                    return ConstraintSolverState::MODIFIED;
-                } else if (candidates.empty()) {
-                    return ConstraintSolverState::UNSOLVABLE;
-                }
-            }
+    // check box
+    size_t boxRow = row / grid.boxLen;
+    size_t boxCol = col / grid.boxLen;
+    for (size_t i = boxRow * grid.boxLen; i < boxRow * grid.boxLen + grid.boxLen; i++) {
+        for (size_t j = boxCol * grid.boxLen; j < boxCol * grid.boxLen + grid.boxLen; j++) {
+            candidates.at(grid.at(i, j)) = false;
         }
-
-        return solved ? ConstraintSolverState::SOLVED : ConstraintSolverState::UNMODIFIED;
     }
-};
 
-static bool
-selectNextCell(ConstraintSolverSudoku& sudoku, int& bestRow, int& bestCol)
+    std::vector<int> numbers;
+    for (int num = 1; num <= grid.sideLen; num++) {
+        if (candidates.at(num)) {
+            numbers.push_back(num);
+        }
+    }
+
+    return numbers;
+}
+
+ConstraintSolverState
+solveTrivialCells(SudokuGrid& grid)
 {
-    size_t minCandidates = ConstraintSolverSudoku::SIZE + 1;
-    bestRow = -1;
-    bestCol = -1;
-    for (int row = 0; row < ConstraintSolverSudoku::SIZE; row++) {
-        for (int col = 0; col < ConstraintSolverSudoku::SIZE; col++) {
-            if (sudoku.isCellFilled(row, col)) {
+    bool solved = true;
+    for (int row = 0; row < grid.sideLen; row++) {
+        for (int col = 0; col < grid.sideLen; col++) {
+            if (grid.isCellFilled(row, col)) {
                 // Cell is already filled. No further checks necessary.
                 continue;
             }
-            size_t numCandidates = sudoku.getCellPossibilities(row, col).size();
+            solved = false;
+            auto candidates = getCellPossibilities(grid, row, col);
+
+            if (candidates.size() == 1) {
+                grid.at(row, col) = candidates.front();
+                return ConstraintSolverState::MODIFIED;
+            } else if (candidates.empty()) {
+                return ConstraintSolverState::UNSOLVABLE;
+            }
+        }
+    }
+
+    return solved ? ConstraintSolverState::SOLVED : ConstraintSolverState::UNMODIFIED;
+}
+
+ConstraintSolverState
+solveTrivialCellsIter(SudokuGrid& grid)
+{
+    ConstraintSolverState lastState;
+    while ((lastState = solveTrivialCells(grid)) == ConstraintSolverState::MODIFIED) {
+    }
+
+    return lastState;
+}
+
+bool
+selectNextCell(const SudokuGrid& grid, int& bestRow, int& bestCol)
+{
+    size_t minCandidates = grid.sideLen + 1;
+    bestRow = -1;
+    bestCol = -1;
+    for (int row = 0; row < grid.sideLen; row++) {
+        for (int col = 0; col < grid.sideLen; col++) {
+            if (grid.isCellFilled(row, col)) {
+                // Cell is already filled. No further checks necessary.
+                continue;
+            }
+            size_t numCandidates = getCellPossibilities(grid, row, col).size();
             if (1 < numCandidates && numCandidates < minCandidates) {
                 bestRow = row;
                 bestCol = col;
@@ -114,34 +105,35 @@ selectNextCell(ConstraintSolverSudoku& sudoku, int& bestRow, int& bestCol)
             }
         }
     }
-    return minCandidates <= ConstraintSolverSudoku::SIZE;
+    return minCandidates <= grid.sideLen;
 }
 
-static std::unique_ptr<SudokuGrid>
-_solve(ConstraintSolverSudoku& sudoku)
+std::unique_ptr<SudokuGrid>
+_solve(SudokuGrid& grid)
 {
-    while (true) {
-        ConstraintSolverState solveResult = sudoku.solveTrivial();
-        if (solveResult == ConstraintSolverState::UNMODIFIED) {
+    switch (solveTrivialCellsIter(grid)) {
+        case ConstraintSolverState::MODIFIED:
+            assert(false); // This cannot happen because it would result in another iteration of solveTrivialCells()
+            break;
+        case ConstraintSolverState::UNMODIFIED:
             // Not changed, need to try a cell value and backtrack if erroneous
             break;
-        } else if (solveResult == ConstraintSolverState::SOLVED) {
-            return std::make_unique<SudokuGrid>(sudoku.grid);
-        } else if (solveResult == ConstraintSolverState::UNSOLVABLE) {
+        case ConstraintSolverState::SOLVED:
+            return std::make_unique<SudokuGrid>(grid);
+        case ConstraintSolverState::UNSOLVABLE:
             return nullptr;
-        }
     }
 
     int bestRow;
     int bestCol;
-    if (!selectNextCell(sudoku, bestRow, bestCol)) {
+    if (!selectNextCell(grid, bestRow, bestCol)) {
         std::cout << "Error: invalid sudoku" << std::endl;
         return nullptr;
     }
 
-    const auto candidates = sudoku.getCellPossibilities(bestRow, bestCol);
+    const auto candidates = getCellPossibilities(grid, bestRow, bestCol);
     for (const auto candidate : candidates) {
-        ConstraintSolverSudoku sudokuCopy(sudoku);
+        SudokuGrid sudokuCopy(grid);
         sudokuCopy.at(bestRow, bestCol) = candidate;
 
         auto solution = _solve(sudokuCopy);
@@ -159,6 +151,6 @@ SudokuConstraintSolver::~SudokuConstraintSolver() = default;
 std::unique_ptr<SudokuGrid>
 SudokuConstraintSolver::solve(const SudokuGrid& sudokuGrid) const
 {
-    ConstraintSolverSudoku sudoku(sudokuGrid);
+    SudokuGrid sudoku(sudokuGrid);
     return _solve(sudoku);
 }
