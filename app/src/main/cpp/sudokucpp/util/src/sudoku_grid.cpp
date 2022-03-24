@@ -53,7 +53,7 @@ SudokuGrid::at(size_t row, size_t col) const
 }
 
 bool
-SudokuGrid::isCellFilled(int row, int col) const
+SudokuGrid::isCellFilled(size_t row, size_t col) const
 {
     return at(row, col) > 0;
 }

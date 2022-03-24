@@ -38,7 +38,7 @@ android {
                         "-DANDROID_STL=c++_shared",
 
                         // Do not package and build test code (leads to errors on Android)
-                        "-DPACKAGE_TESTS=OFF",
+                        "-DBUILD_TESTING=FALSE",
                         // Build the android artifact of our library
                         "-DBUILD_ANDROID=TRUE"
 

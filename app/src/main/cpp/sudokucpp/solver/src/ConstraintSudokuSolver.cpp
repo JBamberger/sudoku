@@ -16,7 +16,7 @@ enum class ConstraintSolverState
 };
 
 std::vector<int>
-getCellPossibilities(const SudokuGrid& grid, int row, int col)
+getCellPossibilities(const SudokuGrid& grid, size_t row, size_t col)
 {
     std::vector<bool> candidates(grid.sideLen + 1);
     std::fill(std::begin(candidates), std::end(candidates), true);
@@ -54,8 +54,8 @@ ConstraintSolverState
 solveTrivialCells(SudokuGrid& grid)
 {
     bool solved = true;
-    for (int row = 0; row < grid.sideLen; row++) {
-        for (int col = 0; col < grid.sideLen; col++) {
+    for (size_t row = 0; row < grid.sideLen; row++) {
+        for (size_t col = 0; col < grid.sideLen; col++) {
             if (grid.isCellFilled(row, col)) {
                 // Cell is already filled. No further checks necessary.
                 continue;

@@ -29,7 +29,7 @@ class SudokuGrid
 
     [[nodiscard]] size_t size() const noexcept;
 
-    [[nodiscard]] bool isCellFilled(int row, int col) const;
+    [[nodiscard]] bool isCellFilled(size_t row, size_t col) const;
 
     static void printGrid(std::ostream& os, const SudokuGrid& grid, bool flat = true);
 

@@ -2,6 +2,34 @@
 #include "sudoku_grid.h"
 #include <sstream>
 
+TEST(sudoku_grid, test_sudoku_grid_init_min_size)
+{
+    SudokuGrid grid1(1);
+    EXPECT_EQ(grid1.sideLen, 1);
+    EXPECT_EQ(grid1.boxLen, 1);
+    EXPECT_EQ(grid1.size(), 1);
+
+    SudokuGrid grid4(4);
+    EXPECT_EQ(grid4.sideLen, 4);
+    EXPECT_EQ(grid4.boxLen, 2);
+    EXPECT_EQ(grid4.size(), 16);
+
+    SudokuGrid grid9(9);
+    EXPECT_EQ(grid9.sideLen, 9);
+    EXPECT_EQ(grid9.boxLen, 3);
+    EXPECT_EQ(grid9.size(), 81);
+
+    SudokuGrid grid16(16);
+    EXPECT_EQ(grid16.sideLen, 16);
+    EXPECT_EQ(grid16.boxLen, 4);
+    EXPECT_EQ(grid16.size(), 256);
+
+    SudokuGrid grid1764(1764);
+    EXPECT_EQ(grid1764.sideLen, 1764);
+    EXPECT_EQ(grid1764.boxLen, 42);
+    EXPECT_EQ(grid1764.size(), 3111696);
+}
+
 TEST(sudoku_grid, test_sudoku_grid_printGridFlat4x4empty)
 {
     SudokuGrid grid(4);
