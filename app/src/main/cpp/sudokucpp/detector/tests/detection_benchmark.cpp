@@ -50,7 +50,6 @@ loop(const std::vector<SudokuGroundTruth>& groundTruth, double thresh = 0.9)
 void
 showFailures(const std::vector<SudokuGroundTruth>& failures)
 {
-
     if (failures.empty()) {
         return;
     }

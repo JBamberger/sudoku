@@ -38,16 +38,16 @@ double
 contourIoU(const Contour& a, const Contour& b);
 
 cv::Mat
-binarizeSudoku(const cv::Mat& image);
+binarizeSudoku(const cv::Mat& grayImage);
 
 void
 detectCellsFast(size_t height, size_t width, std::array<Contour, 81>& cellCoords);
 
 void
-detectCells(const cv::Mat& image, std::array<Contour, 81>& cellCoords);
+detectCells(const cv::Mat& grayImage, std::array<Contour, 81>& cellCoords);
 
 void
-detectCellsRobust(const cv::Mat& image, std::array<Contour, 81>& cellCoords);
+detectCellsRobust(const cv::Mat& grayImage, std::array<Contour, 81>& cellCoords);
 
 void
 fillMissingSquares(std::array<Contour, 81>& cellCoordinates);

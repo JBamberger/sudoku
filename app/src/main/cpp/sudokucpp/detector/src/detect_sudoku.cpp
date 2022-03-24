@@ -8,12 +8,10 @@
 #include <mathutil.h>
 #include <utils.h>
 
-//#include <opencv2/ximgproc.hpp>
-#include <ximgproc_compat.h>
-
 #include <algorithm>
 #include <array>
 #include <opencv2/imgproc.hpp>
+#include <ximgproc_compat.h>
 
 cv::Mat
 threshMorphed(const cv::Mat& image, int morphSize)
@@ -178,9 +176,13 @@ locateSudokuContour(const std::vector<Contour>& contours, const cv::Point2f& ima
 bool
 detectSudoku(const cv::Mat& sudokuImage, std::array<cv::Point2f, 4>& sudokuCorners, int scaled_side_len)
 {
-    // Work in grayscale. Color is not necessary here.
     cv::Mat graySudoku;
-    cv::cvtColor(sudokuImage, graySudoku, cv::COLOR_BGR2GRAY);
+    if (sudokuImage.type() != CV_8UC1) {
+        // Work in grayscale. Color is not necessary here.
+        cv::cvtColor(sudokuImage, graySudoku, cv::COLOR_BGR2GRAY);
+    } else{
+        graySudoku = sudokuImage;
+    }
 
     // Scale longer side to scaled_side_len
     auto [scale, normSudoku] = resizeMaxSideLen(graySudoku, scaled_side_len);
@@ -201,7 +203,7 @@ detectSudoku(const cv::Mat& sudokuImage, std::array<cv::Point2f, 4>& sudokuCorne
     cv::Point2f imageCenter(static_cast<float>(normSudoku.cols) / 2.f, static_cast<float>(normSudoku.rows) / 2.f);
     auto sudokuLocation = locateSudokuContour(contours, imageCenter);
     if (sudokuLocation.empty()) {
-        // could not localize the sudoku
+        // could not locate the sudoku
         return false;
     }
 
@@ -312,17 +314,12 @@ contourIoU(const Contour& a, const Contour& b)
 }
 
 cv::Mat
-binarizeSudoku(const cv::Mat& image)
+binarizeSudoku(const cv::Mat& grayImage)
 {
-    cv::Mat gray;
-    cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
-
     cv::Mat blurred;
-    cv::GaussianBlur(gray, blurred, { 5, 5 }, 0);
+    cv::GaussianBlur(grayImage, blurred, { 5, 5 }, 0);
 
     cv::Mat sudoku;
-    //        cv::ximgproc::niBlackThreshold(
-    //          blurred, sudoku, 255, cv::THRESH_BINARY_INV, 51, 0.2, cv::ximgproc::BINARIZATION_SAUVOLA);
     savoulaThreshInv(blurred, sudoku, 255, 51, 0.2);
 
     const auto kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, { 5, 5 });
@@ -365,9 +362,9 @@ detectCellsFast(size_t height, size_t width, std::array<Contour, 81>& cellCoords
 }
 
 void
-detectCells(const cv::Mat& image, std::array<Contour, 81>& cellCoords)
+detectCells(const cv::Mat& grayImage, std::array<Contour, 81>& cellCoords)
 {
-    auto sudoku = binarizeSudoku(image);
+    auto sudoku = binarizeSudoku(grayImage);
 
     std::vector<Contour> contours;
     cv::findContours(sudoku, contours, cv::RETR_CCOMP, cv::CHAIN_APPROX_SIMPLE);
@@ -398,12 +395,9 @@ detectCells(const cv::Mat& image, std::array<Contour, 81>& cellCoords)
 }
 
 void
-detectCellsRobust(const cv::Mat& image, std::array<Contour, 81>& cellCoords)
+detectCellsRobust(const cv::Mat& grayImage, std::array<Contour, 81>& cellCoords)
 {
-    cv::Mat gray;
-    cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
-
-    std::vector<Contour> squares = findSquares(gray);
+    std::vector<Contour> squares = findSquares(grayImage);
     std::vector<Contour> goodSquares = convexContourNms(squares, 0.7);
 
     // Select all candidates with area in the given size range and compute the approximate quad.
@@ -417,14 +411,14 @@ detectCellsRobust(const cv::Mat& image, std::array<Contour, 81>& cellCoords)
         }
 
         // Grid cell in the sudoku occupied by the current cell candidate.
-        auto gridPoint = contourCenter(cellCandidate) / (1024 / 9);
-        assert(0 <= gridPoint.x && gridPoint.x <= 1024 && 0 <= gridPoint.y && gridPoint.y <= 1024);
+        auto [x, y] = contourCenter(cellCandidate) / (1024 / 9);
+        assert(0 <= x && x <= 1024 && 0 <= y && y <= 1024);
 
-        auto nodeIndex = gridPoint.x + 9 * gridPoint.y;
+        auto nodeIndex = x + 9 * y;
         if (cellCoords.at(nodeIndex).empty()) {
             cellCoords.at(nodeIndex) = cellCandidate;
         } else {
-            std::cout << "Cell at (" << gridPoint.x << "," << gridPoint.y << ") already occupied." << std::endl;
+            std::cout << "Cell at (" << x << "," << y << ") already occupied." << std::endl;
         }
     }
 }
@@ -455,7 +449,6 @@ fillMissingSquares(std::array<Contour, 81>& cellCoordinates)
                 a.at<float>(row, d) = coeff;
                 coeff = coeff * static_cast<float>(points[row].x);
             }
-
         }
 
         // Add the start and end constraints for the polynomial (derivative should be 0.0 at the borders)
