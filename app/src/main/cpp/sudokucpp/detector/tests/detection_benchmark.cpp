@@ -1,6 +1,3 @@
-#include <SudokuDetector.h>
-
-#include <config.h>
 #include <drawutil.h>
 #include <utils.h>
 
@@ -117,7 +114,7 @@ main(int argc, char* argv[])
     }
 
     fs::path root(argv[1]);
-    fs::path gtPath = root / "data/sudokus/ground_truth_new.csv";
+    fs::path gtPath = root / "data" / "sudokus" / "ground_truth_new.csv";
 
     if (!fs::exists(gtPath) || !fs::is_regular_file(gtPath)) {
         std::cerr << "The specified gt path is not a file." << std::endl;

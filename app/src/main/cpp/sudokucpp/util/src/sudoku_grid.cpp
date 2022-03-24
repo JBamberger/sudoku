@@ -67,7 +67,6 @@ SudokuGrid::size() const noexcept
 void
 SudokuGrid::printGrid(std::ostream& os, const SudokuGrid& grid, bool flat)
 {
-
     std::string vblock_div;
     if (!flat) {
         std::stringstream ss;
