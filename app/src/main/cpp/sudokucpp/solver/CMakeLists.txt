@@ -4,4 +4,13 @@ add_library(sudoku_solver
         src/ConstraintSudokuSolver.cpp src/ConstraintSudokuSolver.h
         src/SudokuSolver.cpp include/SudokuSolver.h
         )
-target_include_directories(sudoku_solver PUBLIC include)
+target_link_libraries(sudoku_solver PUBLIC
+        sudoku_utils)
+target_include_directories(sudoku_solver PUBLIC
+        sudoku_utils
+        include)
+
+
+if (PACKAGE_TESTS)
+    add_subdirectory(tests)
+endif ()

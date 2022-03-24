@@ -30,11 +30,11 @@ runTest(SolverType solverType, const std::string& path)
             int errCnt = 0;
             if (!challenge.isValidSolution(result.get(), &errCnt)) {
                 std::cout << "Failed with " << errCnt << " errors." << std::endl;
-                printGrid(*result, false);
+                SudokuGrid::printGrid(std::cout, *result, false);
 
-                printGrid(*result);
-                printGrid(challenge.solution);
-                printGrid(challenge.grid);
+                std::cout << *result << '\n';
+                std::cout << challenge.solution << '\n';
+                std::cout << challenge.grid << '\n';
             }
             EXPECT_EQ(errCnt, 0);
         }

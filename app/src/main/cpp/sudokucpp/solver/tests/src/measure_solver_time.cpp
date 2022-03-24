@@ -2,6 +2,7 @@
 #include <chrono>
 #include <fmt/format.h>
 #include <string>
+#include <array>
 
 #include "test_helper.h"
 #include "SudokuSolver.h"
