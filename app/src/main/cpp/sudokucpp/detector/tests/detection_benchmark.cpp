@@ -1,5 +1,6 @@
 #include <drawutil.h>
 #include <utils.h>
+#include <geometry.h>
 
 #include <detect_sudoku.h>
 #include <filesystem>
@@ -22,7 +23,7 @@ loop(const std::vector<SudokuGroundTruth>& groundTruth, double thresh = 0.9)
 
         std::array<cv::Point2f, 4> sudokuCorners;
         if (detectSudoku(sudokuImg, sudokuCorners, 1024)) {
-            double iou = contourIoU(asContour(sudokuCorners), asContour(gtSudoku.bounds.corners));
+            double iou = convexContourIoU(asContour(sudokuCorners), asContour(gtSudoku.bounds.corners));
             std::cout << (iou > thresh) << ";  " << iou << " ";
             if (iou > thresh) {
                 successCount++;

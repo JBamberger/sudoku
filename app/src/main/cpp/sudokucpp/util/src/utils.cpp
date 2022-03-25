@@ -3,39 +3,9 @@
 #include <utils.h>
 
 #include <algorithm>
-#include <array>
 #include <fstream>
 #include <ostream>
 #include <sstream>
-#include <utility>
-
-std::istream&
-operator>>(std::istream& str, Quad& data)
-{
-    char delim;
-    Quad tmp;
-    if (str >> tmp.corners.at(0).x >> delim >> tmp.corners.at(0).y >> delim //
-        >> tmp.corners.at(1).x >> delim >> tmp.corners.at(1).y >> delim     //
-        >> tmp.corners.at(2).x >> delim >> tmp.corners.at(2).y >> delim     //
-        >> tmp.corners.at(3).x >> delim >> tmp.corners.at(3).y) {
-
-        data = std::move(tmp);
-    } else {
-        str.setstate(std::ios::failbit);
-    }
-    return str;
-}
-
-std::ostream&
-operator<<(std::ostream& str, const Quad& data)
-{
-    std::string delim = ", ";
-    str << data.corners.at(0).x << delim << data.corners.at(0).y << delim //
-        << data.corners.at(1).x << delim << data.corners.at(1).y << delim //
-        << data.corners.at(2).x << delim << data.corners.at(2).y << delim //
-        << data.corners.at(3).x << delim << data.corners.at(3).y;
-    return str;
-}
 
 std::vector<SudokuGroundTruth>
 readGroundTruth(const std::filesystem::path& root, const std::filesystem::path& file)
@@ -53,7 +23,7 @@ readGroundTruth(const std::filesystem::path& root, const std::filesystem::path& 
         std::istringstream lineStream(line);
 
         std::string p;
-        Quad q;
+        Quad_<double> q;
 
         std::getline(lineStream, p, ',');
         lineStream >> q;

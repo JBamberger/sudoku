@@ -1,7 +1,7 @@
 #include <SudokuDetection.h>
 
+#include "geometry.h"
 #include <drawutil.h>
-#include <utils.h>
 
 void
 SudokuDetection::drawOverlay(cv::Mat& canvas) const
