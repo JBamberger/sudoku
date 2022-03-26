@@ -5,6 +5,7 @@
 #ifndef SUDOKUDETECTION_H
 #define SUDOKUDETECTION_H
 
+#include "geometry.h"
 #include <array>
 #include <memory>
 #include <opencv2/core/mat.hpp>

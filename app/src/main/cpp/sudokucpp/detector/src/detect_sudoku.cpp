@@ -2,14 +2,12 @@
 // Created by jannik on 25.08.2021.
 //
 
-#include <detect_sudoku.h>
+#include "detect_sudoku.h"
 
-#include <drawutil.h>
-#include <geometry.h>
-#include <mathutil.h>
-#include <utils.h>
+#include "drawutil.h"
+#include "geometry.h"
+#include "mathutil.h"
 
-#include <algorithm>
 #include <array>
 #include <opencv2/imgproc.hpp>
 #include <ximgproc_compat.h>
