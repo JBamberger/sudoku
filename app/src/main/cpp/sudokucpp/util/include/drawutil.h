@@ -5,7 +5,9 @@
 #include <opencv2/imgproc.hpp>
 #include <vector>
 
-
+static const cv::Scalar RED{ 0, 0, 255 };
+static const cv::Scalar GREEN{ 0, 255, 0 };
+static const cv::Scalar BLUE{ 255, 0, 0 };
 
 template<typename T>
 void
@@ -17,10 +19,26 @@ drawOrientedRect(cv::Mat& canvas, const std::vector<cv::Point_<T>>& contour)
     const cv::Point& p2(contour.at(1));
     const cv::Point& p3(contour.at(2));
     const cv::Point& p4(contour.at(3));
-    cv::line(canvas, p1, p2, { 255, 0, 0 }, 2);
-    cv::line(canvas, p2, p3, { 0, 0, 255 }, 2);
-    cv::line(canvas, p3, p4, { 0, 255, 0 });
-    cv::line(canvas, p4, p1, { 0, 255, 0 });
+    cv::line(canvas, p1, p2, BLUE, 2);
+    cv::line(canvas, p2, p3, RED, 2);
+    cv::line(canvas, p3, p4, GREEN);
+    cv::line(canvas, p4, p1, GREEN);
+}
+
+template<typename T>
+void
+drawOrientedRect(cv::Mat& canvas, const std::vector<cv::Point_<T>>& contour, const cv::Scalar& color)
+{
+    assert(contour.size() == 4);
+
+    const cv::Point& p1(contour.at(0));
+    const cv::Point& p2(contour.at(1));
+    const cv::Point& p3(contour.at(2));
+    const cv::Point& p4(contour.at(3));
+    cv::line(canvas, p1, p2, color, 2);
+    cv::line(canvas, p2, p3, 0.9 * color, 2);
+    cv::line(canvas, p3, p4, 0.8 * color,2 );
+    cv::line(canvas, p4, p1, 0.7 * color,2 );
 }
 
 inline void
