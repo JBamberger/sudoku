@@ -114,7 +114,7 @@ main(int argc, char* argv[])
     }
 
     fs::path root(argv[1]);
-    fs::path gtPath = root / "data" / "sudokus" / "ground_truth_new.csv";
+    fs::path gtPath = root / "data" / "sudokus" / "annotations" / "sudoku_bounds.csv";
 
     if (!fs::exists(gtPath) || !fs::is_regular_file(gtPath)) {
         std::cerr << "The specified gt path is not a file." << std::endl;
