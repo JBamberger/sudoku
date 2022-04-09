@@ -1,5 +1,6 @@
 import math
 import os
+from os.path import dirname
 from typing import Tuple
 
 import cv2 as cv
@@ -9,6 +10,11 @@ from skimage.filters import threshold_sauvola
 from torch.nn import functional as F
 
 import config
+
+
+def get_project_root():
+    project_dir = dirname(dirname(__file__))
+    return project_dir
 
 
 def read_ground_truth(gt_file):
@@ -74,6 +80,32 @@ def oriented_angle(x1, y1, x2, y2):
     det = x1 * y2 - y1 * x2
     angle = math.atan2(det, dot)
     return angle
+
+
+def rot(coords, h, w) -> Tuple[np.ndarray, np.ndarray]:
+    mid = np.array([w, h]).reshape(1, 2) / 2
+
+    coords = coords - mid
+    coords = np.matmul(coords, CCW90)
+    mid = mid[:, ::-1]
+
+    coords = coords + mid
+    coords = coords.astype(np.int32)
+
+    return coords
+
+
+def rot_cw(coords, h, w) -> Tuple[np.ndarray, np.ndarray]:
+    mid = np.array([w, h]).reshape(1, 2) / 2
+
+    coords = coords - mid
+    coords = np.matmul(coords, CCW270)
+    mid = mid[:, ::-1]
+
+    coords = coords + mid
+    coords = coords.astype(np.int32)
+
+    return coords
 
 
 def rotation_correction(img, coords) -> Tuple[np.ndarray, np.ndarray]:
