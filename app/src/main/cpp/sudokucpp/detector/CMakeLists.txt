@@ -19,6 +19,6 @@ target_link_libraries(sudoku_detector PUBLIC
         sudoku_solver
         )
 
-if (PACKAGE_TESTS)
+if (BUILD_TESTING)
     add_subdirectory(tests)
 endif ()

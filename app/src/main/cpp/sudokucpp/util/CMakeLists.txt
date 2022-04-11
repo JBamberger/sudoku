@@ -16,6 +16,6 @@ target_link_libraries(sudoku_utils PUBLIC
         ${OpenCV_LIBS}
         )
 
-if (PACKAGE_TESTS)
+if (BUILD_TESTING)
     add_subdirectory(tests)
 endif ()

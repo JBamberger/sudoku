@@ -11,6 +11,6 @@ target_include_directories(sudoku_solver PUBLIC
         include)
 
 
-if (PACKAGE_TESTS)
+if (BUILD_TESTING)
     add_subdirectory(tests)
 endif ()
