@@ -3,13 +3,9 @@ project(sudokucpp)
 
 set(CMAKE_CXX_STANDARD 17)
 
-find_package(fmt)
-find_package(OpenCV 4.5 REQUIRED core imgcodecs imgproc highgui videoio dnn)
+find_package(fmt REQUIRED)
+find_package(OpenCV 4.5 REQUIRED core imgcodecs imgproc highgui videoio dnn) # ximgproc
 find_library(log-lib log)
-
-if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
-    include(CTest)
-endif ()
 
 include(CTest)
 

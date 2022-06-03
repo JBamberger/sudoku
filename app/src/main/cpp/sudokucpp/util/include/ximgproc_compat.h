@@ -48,7 +48,7 @@
 
 #include <opencv2/core.hpp>
 
-void
+inline void
 savoulaThreshInv(const cv::Mat& src, cv::Mat& dst, double maxValue, int blockSize, double k)
 {
     // Input grayscale image

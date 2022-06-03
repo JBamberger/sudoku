@@ -1,6 +1,7 @@
 #include "CellClassifier.h"
 
 #include <opencv2/dnn.hpp>
+#include <opencv2/imgproc.hpp>
 #include <string>
 
 struct CellClassifier::Impl
@@ -62,7 +63,8 @@ struct CellClassifier::Impl
 
 CellClassifier::CellClassifier(const std::string& classifierPath)
   : pimpl{ std::make_unique<Impl>(classifierPath) }
-{}
+{
+}
 
 CellClassifier::CellClassifier(CellClassifier&&) noexcept = default;
 
@@ -72,13 +74,44 @@ CellClassifier&
 CellClassifier::operator=(CellClassifier&&) noexcept = default;
 
 std::vector<int>
-CellClassifier::classify(const std::vector<cv::Mat>& patches)
+CellClassifier::classify(const std::vector<cv::Mat>& patches) const
 {
     return pimpl->classify(patches);
 }
 int
 
-CellClassifier::classify(const cv::Mat& patch)
+CellClassifier::classify(const cv::Mat& patch) const
 {
     return pimpl->classify(patch);
+}
+std::vector<int>
+CellClassifier::classify(const cv::Mat& frame, const std::vector<Quad>& cellBounds) const
+{
+    const int pad = 3;
+    const int patchSize = 64;
+    const float padNeg = -pad;
+    const float padPos = patchSize + pad;
+    const cv::Size croppedSize(patchSize, patchSize);
+    std::array<cv::Point2f, 4> to{
+        cv::Point2f(padNeg, padNeg),
+        cv::Point2f(padPos, padNeg),
+        cv::Point2f(padPos, padPos),
+        cv::Point2f(padNeg, padPos),
+    };
+
+    std::vector<cv::Mat> patches(cellBounds.size());
+    for (size_t i = 0; i < cellBounds.size(); i++) {
+        const auto& corners = cellBounds.at(i).corners;
+        const std::array<cv::Point2f, 4> from{
+            static_cast<cv::Point2f>(corners.at(0)),
+            static_cast<cv::Point2f>(corners.at(1)),
+            static_cast<cv::Point2f>(corners.at(2)),
+            static_cast<cv::Point2f>(corners.at(3)),
+        };
+
+        const auto m = cv::getPerspectiveTransform(from, to);
+        cv::warpPerspective(frame, patches.at(i), m, croppedSize, cv::INTER_AREA);
+    }
+
+    return classify(patches);
 }

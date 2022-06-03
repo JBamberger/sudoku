@@ -2,8 +2,10 @@
 #include <geometry.h>
 #include <utils.h>
 
+#include "cli_opts.h"
+#include "detect_sudoku.h"
+#include "ximgproc_compat.h"
 #include <chrono>
-#include <detect_sudoku.h>
 #include <filesystem>
 #include <fmt/format.h>
 #include <iostream>
@@ -11,7 +13,7 @@
 
 namespace fs = std::filesystem;
 
-struct Result
+struct DetectionResult
 {
     double time_ms = 0.0;
     bool success = false;
@@ -20,7 +22,7 @@ struct Result
 };
 
 auto
-test(const SudokuGroundTruth& gtSudoku, Result& result) -> void
+test(const SudokuGroundTruth& gtSudoku, DetectionResult& result) -> void
 {
     using namespace std::chrono;
 
@@ -39,12 +41,13 @@ test(const SudokuGroundTruth& gtSudoku, Result& result) -> void
 }
 
 auto
-loop(const std::vector<SudokuGroundTruth>& groundTruth, std::vector<Result>& results, double thresh = 0.9)
+loop(const std::vector<SudokuGroundTruth>& groundTruth, std::vector<DetectionResult>& results, double thresh = 0.9)
   -> std::vector<size_t>
 {
     {
         auto result = results.begin();
-        for (auto gt = groundTruth.begin(); gt < groundTruth.end(); gt++, result++) {
+        auto gt = groundTruth.begin();
+        for (; gt != groundTruth.end() && result != results.end(); gt++, result++) {
             test(*gt, *result);
 
             fmt::print("success={:d}; iou={:.03f}; time={:5.01f}ms {}\n",
@@ -57,8 +60,8 @@ loop(const std::vector<SudokuGroundTruth>& groundTruth, std::vector<Result>& res
     }
 
     std::vector<size_t> failures;
-
     int successCount = 0, detFailCount = 0, iouFailCount = 0;
+    double time = 0;
     for (size_t i = 0; i < results.size(); i++) {
         const auto& result = results[i];
         if (result.success) {
@@ -68,6 +71,7 @@ loop(const std::vector<SudokuGroundTruth>& groundTruth, std::vector<Result>& res
                 iouFailCount++;
                 failures.push_back(i);
             }
+            time += result.time_ms;
         } else {
             detFailCount++;
             failures.push_back(i);
@@ -78,16 +82,18 @@ loop(const std::vector<SudokuGroundTruth>& groundTruth, std::vector<Result>& res
                "Successful:       {:d}\n"
                "Detection failed: {:d}\n"
                "IoU failed:       {:d}\n"
+               "Mean time:        {:.01f}ms\n"
                "#########################################\n",
                successCount,
                detFailCount,
-               iouFailCount);
+               iouFailCount,
+               time / (successCount + detFailCount));
     return failures;
 }
 
 auto
 showFailures(const std::vector<SudokuGroundTruth>& groundTruth,
-             const std::vector<Result>& results,
+             const std::vector<DetectionResult>& results,
              const std::vector<size_t>& failures) -> void
 {
     if (failures.empty()) {
@@ -137,28 +143,68 @@ showFailures(const std::vector<SudokuGroundTruth>& groundTruth,
 }
 
 auto
+runInteractive(const fs::path& fileRoot, const fs::path& gtPath) -> void
+{
+    auto gt = readGroundTruth(fileRoot, gtPath);
+
+    std::cout << "OpenCV Version: " << cv::getVersionString() << std::endl;
+    std::cout << "Found " << gt.size() << " ground truth entries" << std::endl;
+
+    std::vector<DetectionResult> results(gt.size());
+    const auto failures = loop(gt, results);
+
+    showFailures(gt, results, failures);
+}
+
+auto
+runNonInteractive(const fs::path& fileRoot, const fs::path& gtPath) -> void
+{
+    auto gt = readGroundTruth(fileRoot, gtPath);
+    std::vector<DetectionResult> results(gt.size());
+    loop(gt, results);
+}
+
+auto
+runBenchmark(const fs::path& fileRoot, const fs::path& gtPath, size_t sudokuIndex, size_t numIterations) -> void
+{
+    volatile double a = 0;
+    auto gt = readGroundTruth(fileRoot, gtPath);
+    const auto sudoku = gt.at(sudokuIndex);
+    for (size_t i = 0; i < numIterations; i++) {
+        DetectionResult result;
+        test(sudoku, result);
+        a += result.iou;
+    }
+}
+
+auto
 main(int argc, char* argv[]) -> int
 {
-    if (argc < 2) {
+    CliOptionsParser parser(argc, argv);
+
+    const std::string& rootStr = parser.getPositionalOption(0);
+    if (rootStr.empty()) {
         std::cerr << "Missing path to sources. Call as <benchmark-exe>.exe <path-to-sources>" << std::endl;
         exit(1);
     }
-
-    fs::path root(argv[1]);
+    fs::path root(rootStr);
     fs::path gtPath = root / "data" / "sudokus" / "annotations" / "sudoku_bounds.csv";
-
     if (!fs::exists(gtPath) || !fs::is_regular_file(gtPath)) {
         std::cerr << "The specified gt path is not a file." << std::endl;
         exit(1);
     }
 
-    auto gt = readGroundTruth(root, gtPath);
-
-    std::cout << "OpenCV Version: " << cv::getVersionString() << std::endl;
-    std::cout << "Found " << gt.size() << " ground truth entries" << std::endl;
-
-    std::vector<Result> results(gt.size());
-    const auto failures = loop(gt, results);
-
-    showFailures(gt, results, failures);
+    const std::string& mode = parser.getOption("--mode");
+    if (mode.empty() || mode == "interactive") {
+        runInteractive(root, gtPath);
+    } else if (mode == "static") {
+        runNonInteractive(root, gtPath);
+    } else if (mode == "benchmark") {
+        size_t sudokuIndex = 0;
+        size_t numIterations = 1000;
+        runBenchmark(root, gtPath, sudokuIndex, numIterations);
+    } else {
+        std::cerr << "Invalid mode: '" << mode << "'. Must be one of 'interactive' or 'static'." << std::endl;
+        exit(1);
+    }
 }

@@ -1,12 +1,11 @@
 #include <SudokuDetector.h>
 
+#include "detect_sudoku.h"
 #include <SudokuSolver.h>
-#include <detect_sudoku.h>
-#include <drawutil.h>
-#include <mathutil.h>
-
 #include <algorithm>
 #include <array>
+#include <drawutil.h>
+#include <mathutil.h>
 
 [[nodiscard]] cv::Mat
 getUnwarpTransform(const std::array<cv::Point2f, 4>& corners, const cv::Size& outSize)
@@ -31,7 +30,8 @@ struct SudokuDetector::Impl
     explicit Impl(const std::string& classifierPath)
       : cellClassifier(std::make_unique<CellClassifier>(classifierPath))
       , sudokuSolver(SudokuSolver::create(SolverType::Dlx))
-    {}
+    {
+    }
 
     [[nodiscard]] std::unique_ptr<SudokuDetection> detect(const cv::Mat& sudokuImage) const
     {
@@ -128,7 +128,8 @@ struct SudokuDetector::Impl
 
 SudokuDetector::SudokuDetector(const std::string& classifierPath)
   : pimpl(std::make_unique<Impl>(classifierPath))
-{}
+{
+}
 
 SudokuDetector::SudokuDetector(SudokuDetector&&) noexcept = default;
 
