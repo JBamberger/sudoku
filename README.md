@@ -13,6 +13,21 @@ The Android application is very un-optimized and performs the processing on the 
 leads to lagging UI updated etc. Further, it does not correctly query the sensor orientation, thus
 the image preview has the wrong orientation on some phones.
 
+## Digit classification
+
+The classification network performance is very bad because it was trained on a very small dataset with only a small
+number of different fonts. Therefore, often no solution is available because the digit classification introduced some
+errors that make the sudoku unsolvable.
+
+## Benchmark results
+
+CPU: Intel Core i7-6700, RAM: 3000MHz CL14
+
+Sudoku detection average: `23.8ms`
+Sudoku solving average (various difficulty levels): `0.3ms`.
+
+At the moment there are no safeguards to limit the worst-case time. It can be significantly higher than the average.
+
 ## Outdated information
 
 Idea:
