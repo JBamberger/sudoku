@@ -65,5 +65,4 @@ ENDIF ()
 
 IF (BUILD_ANDROID)
     add_subdirectory(android_app)
-    add_subdirectory(jni_binding)
 ENDIF ()
