@@ -7,14 +7,13 @@
 #include "ximgproc_compat.h"
 #include <chrono>
 #include <filesystem>
-#include <fmt/format.h>
+#include <format>
 #include <iostream>
 #include <opencv2/highgui.hpp>
 
 namespace fs = std::filesystem;
 
-struct DetectionResult
-{
+struct DetectionResult {
     double time_ms = 0.0;
     bool success = false;
     std::array<cv::Point2f, 4> sudokuCorners;
@@ -22,8 +21,7 @@ struct DetectionResult
 };
 
 auto
-test(const SudokuGroundTruth& gtSudoku, DetectionResult& result) -> void
-{
+test(const SudokuGroundTruth &gtSudoku, DetectionResult &result) -> void {
     using namespace std::chrono;
 
     const auto sudokuImg = cv::imread(gtSudoku.imagePath.string(), cv::IMREAD_COLOR);
@@ -32,38 +30,41 @@ test(const SudokuGroundTruth& gtSudoku, DetectionResult& result) -> void
     result.success = detectSudoku(sudokuImg, result.sudokuCorners, 1024);
     time_point endDetect = steady_clock::now();
 
-    result.time_ms = static_cast<double>(duration_cast<microseconds>(endDetect - beginDetect).count()) / 1000.0;
+    result.time_ms =
+            static_cast<double>(duration_cast<microseconds>(endDetect - beginDetect).count()) /
+            1000.0;
     if (result.success) {
-        result.iou = convexContourIoU(asContour(result.sudokuCorners), asContour(gtSudoku.bounds.corners));
+        result.iou = convexContourIoU(asContour(result.sudokuCorners),
+                                      asContour(gtSudoku.bounds.corners));
     } else {
         result.iou = 0;
     }
 }
 
 auto
-loop(const std::vector<SudokuGroundTruth>& groundTruth, std::vector<DetectionResult>& results, double thresh = 0.9)
-  -> std::vector<size_t>
-{
+loop(const std::vector <SudokuGroundTruth> &groundTruth, std::vector <DetectionResult> &results,
+     double thresh = 0.9)
+-> std::vector <size_t> {
     {
         auto result = results.begin();
         auto gt = groundTruth.begin();
         for (; gt != groundTruth.end() && result != results.end(); gt++, result++) {
             test(*gt, *result);
 
-            fmt::print("success={:d}; iou={:.03f}; time={:5.01f}ms {}\n",
-                       result->iou > thresh,
-                       result->iou,
-                       result->time_ms,
-                       gt->imagePath.string());
-            std::cout << std::flush;
+            std::cout << std::format("success={:d}; iou={:.03f}; time={:5.01f}ms {}\n",
+                                    result->iou > thresh,
+                                    result->iou,
+                                    result->time_ms,
+                                    gt->imagePath.string())
+                      << std::flush;
         }
     }
 
-    std::vector<size_t> failures;
+    std::vector <size_t> failures;
     int successCount = 0, detFailCount = 0, iouFailCount = 0;
     double time = 0;
     for (size_t i = 0; i < results.size(); i++) {
-        const auto& result = results[i];
+        const auto &result = results[i];
         if (result.success) {
             if (result.iou > thresh) {
                 successCount++;
@@ -78,7 +79,7 @@ loop(const std::vector<SudokuGroundTruth>& groundTruth, std::vector<DetectionRes
         }
     }
 
-    fmt::print("#########################################\n"
+    std::cout << std::format("#########################################\n"
                "Successful:       {:d}\n"
                "Detection failed: {:d}\n"
                "IoU failed:       {:d}\n"
@@ -92,30 +93,29 @@ loop(const std::vector<SudokuGroundTruth>& groundTruth, std::vector<DetectionRes
 }
 
 auto
-showFailures(const std::vector<SudokuGroundTruth>& groundTruth,
-             const std::vector<DetectionResult>& results,
-             const std::vector<size_t>& failures) -> void
-{
+showFailures(const std::vector <SudokuGroundTruth> &groundTruth,
+             const std::vector <DetectionResult> &results,
+             const std::vector <size_t> &failures) -> void {
     if (failures.empty()) {
         return;
     }
 
     size_t sudokuNum = 0;
     while (true) {
-        const auto& index = failures[sudokuNum];
-        const auto& result = results[index];
-        const auto& gt = groundTruth[index];
+        const auto &index = failures[sudokuNum];
+        const auto &result = results[index];
+        const auto &gt = groundTruth[index];
 
         const auto imgPath = gt.imagePath.string();
-        std::cout << fmt::format("Sudoku {:d} Path={:s}\n", sudokuNum, imgPath) << std::flush;
+        std::cout << std::format("Sudoku {:d} Path={:s}\n", sudokuNum, imgPath) << std::flush;
         auto canvas = cv::imread(imgPath, cv::IMREAD_COLOR);
 
         if (result.success) {
-            drawOrientedRect(canvas, asContour(result.sudokuCorners), { 0, 0, 255 });
-            drawOrientedRect(canvas, asContour(gt.bounds.corners), { 0, 255, 0 });
+            drawOrientedRect(canvas, asContour(result.sudokuCorners), {0, 0, 255});
+            drawOrientedRect(canvas, asContour(gt.bounds.corners), {0, 255, 0});
         }
 
-        auto [scale, resizedCanvas] = resizeMaxSideLen(canvas, 1024);
+        auto[scale, resizedCanvas] = resizeMaxSideLen(canvas, 1024);
         cv::imshow("Sudoku", resizedCanvas);
         int key = cv::waitKey();
 
@@ -143,30 +143,28 @@ showFailures(const std::vector<SudokuGroundTruth>& groundTruth,
 }
 
 auto
-runInteractive(const fs::path& fileRoot, const fs::path& gtPath) -> void
-{
+runInteractive(const fs::path &fileRoot, const fs::path &gtPath) -> void {
     auto gt = readGroundTruth(fileRoot, gtPath);
 
     std::cout << "OpenCV Version: " << cv::getVersionString() << std::endl;
     std::cout << "Found " << gt.size() << " ground truth entries" << std::endl;
 
-    std::vector<DetectionResult> results(gt.size());
+    std::vector <DetectionResult> results(gt.size());
     const auto failures = loop(gt, results);
 
     showFailures(gt, results, failures);
 }
 
 auto
-runNonInteractive(const fs::path& fileRoot, const fs::path& gtPath) -> void
-{
+runNonInteractive(const fs::path &fileRoot, const fs::path &gtPath) -> void {
     auto gt = readGroundTruth(fileRoot, gtPath);
-    std::vector<DetectionResult> results(gt.size());
+    std::vector <DetectionResult> results(gt.size());
     loop(gt, results);
 }
 
 auto
-runBenchmark(const fs::path& fileRoot, const fs::path& gtPath, size_t sudokuIndex, size_t numIterations) -> void
-{
+runBenchmark(const fs::path &fileRoot, const fs::path &gtPath, size_t sudokuIndex,
+             size_t numIterations) -> void {
     volatile double a = 0;
     auto gt = readGroundTruth(fileRoot, gtPath);
     const auto sudoku = gt.at(sudokuIndex);
@@ -178,13 +176,13 @@ runBenchmark(const fs::path& fileRoot, const fs::path& gtPath, size_t sudokuInde
 }
 
 auto
-main(int argc, char* argv[]) -> int
-{
+main(int argc, char *argv[]) -> int {
     CliOptionsParser parser(argc, argv);
 
-    const std::string& rootStr = parser.getPositionalOption(0);
+    const std::string &rootStr = parser.getPositionalOption(0);
     if (rootStr.empty()) {
-        std::cerr << "Missing path to sources. Call as <benchmark-exe>.exe <path-to-sources>" << std::endl;
+        std::cerr << "Missing path to sources. Call as <benchmark-exe>.exe <path-to-sources>"
+                  << std::endl;
         exit(1);
     }
     fs::path root(rootStr);
@@ -194,7 +192,7 @@ main(int argc, char* argv[]) -> int
         exit(1);
     }
 
-    const std::string& mode = parser.getOption("--mode");
+    const std::string &mode = parser.getOption("--mode");
     if (mode.empty() || mode == "interactive") {
         runInteractive(root, gtPath);
     } else if (mode == "static") {
@@ -204,7 +202,8 @@ main(int argc, char* argv[]) -> int
         size_t numIterations = 1000;
         runBenchmark(root, gtPath, sudokuIndex, numIterations);
     } else {
-        std::cerr << "Invalid mode: '" << mode << "'. Must be one of 'interactive' or 'static'." << std::endl;
+        std::cerr << "Invalid mode: '" << mode << "'. Must be one of 'interactive' or 'static'."
+                  << std::endl;
         exit(1);
     }
 }

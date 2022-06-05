@@ -3,6 +3,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <cmath>
 
 SudokuGrid::SudokuGrid(size_t side_len)
   : sideLen(side_len)

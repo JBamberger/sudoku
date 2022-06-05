@@ -46,7 +46,7 @@ readSudokuChallenges(const std::string& path)
     sudokuListFile.open(path);
 
     if (!sudokuListFile.is_open()) {
-        std::cerr << "Could not open sudoku list." << std::endl;
+        std::cerr << "Could not open sudoku list. Path=" << path << std::endl;
         exit(EXIT_FAILURE);
     }
 

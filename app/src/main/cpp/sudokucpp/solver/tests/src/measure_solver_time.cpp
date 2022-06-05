@@ -8,15 +8,14 @@
 #include "SudokuSolver.h"
 
 void
-measure(SolverType solverType, const std::string& path)
-{
+measure(SolverType solverType, const std::string &path) {
     using namespace std::chrono;
-    std::unique_ptr<SudokuSolver> solver = SudokuSolver::create(solverType);
+    std::unique_ptr <SudokuSolver> solver = SudokuSolver::create(solverType);
 
     const auto challenges = readSudokuChallenges(path);
 
     std::vector<double> times;
-    for (const auto& challenge : challenges) {
+    for (const auto &challenge: challenges) {
         auto start = high_resolution_clock::now();
 
         const auto result = solver->solve(challenge.grid);
@@ -27,7 +26,7 @@ measure(SolverType solverType, const std::string& path)
     }
 
     double totalTime = 0.0;
-    for (auto t : times) {
+    for (auto t: times) {
         totalTime += t;
     }
 
@@ -36,7 +35,7 @@ measure(SolverType solverType, const std::string& path)
     double min = std::numeric_limits<double>::max();
     double max = std::numeric_limits<double>::min();
     double var = 0.0;
-    for (auto t : times) {
+    for (auto t: times) {
         double x = t - mean;
         var += x * x;
 
@@ -49,26 +48,27 @@ measure(SolverType solverType, const std::string& path)
     }
     double stddev = sqrt(var);
 
-    fmt::print("{:9.2f} {:9.2f} {:9.2f} {:9.2f} {:9.2f} path={}\n", totalTime, mean, stddev, min, max, path);
+    std::cout << std::format("{:9.2f} {:9.2f} {:9.2f} {:9.2f} {:9.2f} path={}\n",
+                             totalTime, mean, stddev, min, max, path);
 }
 
 int
-main()
-{
+main() {
     std::array<std::string, 6> files{
-                "./solver/tests/test_sudokus.txt",
-        "./solver/tests/any.txt",
-                "./solver/tests/simple.txt",
-                "./solver/tests/easy.txt",         "./solver/tests/intermediate.txt", "./solver/tests/expert.txt",
+            "./solver/tests/test_sudokus.txt",
+            "./solver/tests/any.txt",
+            "./solver/tests/simple.txt",
+            "./solver/tests/easy.txt", "./solver/tests/intermediate.txt",
+            "./solver/tests/expert.txt",
     };
 
-    fmt::print("DLX:\n");
-    fmt::print("totalTime      mean    stddev       min       max path\n");
-    for (const auto& file : files) {
+    std::cout << "DLX:\n"
+              << std::format("totalTime      mean    stddev       min       max path\n");
+    for (const auto &file: files) {
         measure(SolverType::Dlx, file);
     }
-    //    fmt::print("Constraint:\n");
-    //    fmt::print("totalTime      mean    stddev       min       max path\n");
+    //    std::cout << std::format("Constraint:\n");
+    //    std::cout << std::format("totalTime      mean    stddev       min       max path\n");
     //    for (const auto& file : files) {
     //        measure(SolverType::Constraint, file);
     //    }

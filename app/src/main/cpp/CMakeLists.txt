@@ -1,9 +1,8 @@
 cmake_minimum_required(VERSION 3.18)
 project(sudokucpp)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
-find_package(fmt REQUIRED)
 find_package(OpenCV 4.5 REQUIRED core imgcodecs imgproc highgui videoio dnn) # ximgproc
 find_library(log-lib log)
 

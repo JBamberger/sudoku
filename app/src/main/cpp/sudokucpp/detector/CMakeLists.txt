@@ -22,7 +22,7 @@ if (BUILD_TESTING)
             tests/detection_benchmark.cpp
             src/detect_sudoku.h
             )
-    target_link_libraries(benchmark_sudoku_detection PRIVATE sudoku_detector fmt::fmt)
+    target_link_libraries(benchmark_sudoku_detection PRIVATE sudoku_detector)
     target_include_directories(benchmark_sudoku_detection PRIVATE include src)
     #target_link_options(benchmark_sudoku_detection PRIVATE /PROFILE)
 
