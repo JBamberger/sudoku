@@ -9,15 +9,36 @@ Further, the repository contains the prototypical implementation of the algorith
 The sudoku detection uses standard OpenCV functions to find the sudoku outline and cells. Each cell
 is classified with a small CNN. The sudoku solver uses a _Dancing Links_ implementation.
 
-The Android application is very un-optimized and performs the processing on the main thread. This
+![Example result](docs/example_result.jpg)
+
+__Disclaimer:__
+
+_The project is only a proof of concept and in no way production ready._
+
+_The digit classification network performance is very bad because it was trained on a very small dataset with only a
+small number of different fonts. Therefore, often no solution is available because the digit classification introduced
+some errors that make the sudoku unsolvable._
+
+_The Android application is very un-optimized and performs the processing on the main thread. This
 leads to lagging UI updated etc. Further, it does not correctly query the sensor orientation, thus
-the image preview has the wrong orientation on some phones.
+the image preview has the wrong orientation on some phones._
 
-## Digit classification
+_The desktop app lacks a useful CLI or GUI interface._
 
-The classification network performance is very bad because it was trained on a very small dataset with only a small
-number of different fonts. Therefore, often no solution is available because the digit classification introduced some
-errors that make the sudoku unsolvable.
+## Usage
+
+It is not possible to use this project without some own work. The dataset for test cases and training is not included
+due to copyright issues. Therefore, it is necessary to build a new digit dataset from scratch to train the digit
+classifier. The digit classifier can be trained with the python code in `sudokupy/classifier/classifier.py`.
+
+There are two variants, an Android app and a desktop program. The Android app uses the device camera
+as input and continuously scans for sudokus. If one is detected, the solution is superimposed on the
+image. The desktop app is mostly for testing at the moment and uses a file with a list of sudokus as
+input.
+
+To build the Android version it is necessary to install the OpenCV4 Android build and set the path in
+`gradle.properties`. The desktop version requires a normal install of OpenCV4 and uses standard
+mechanics of CMake to detect the library.
 
 ## Benchmark results
 
@@ -27,22 +48,3 @@ Sudoku detection average: `23.8ms`
 Sudoku solving average (various difficulty levels): `0.3ms`.
 
 At the moment there are no safeguards to limit the worst-case time. It can be significantly higher than the average.
-
-## Outdated information
-
-Idea:
-
-1. Read an image file / take an image.
-2. Detect the sudoku within.
-3. Solve the sudoku.
-4. Render the solution into the image.
-
-Current problems:
-
-- [x] Sudoku detection is not complete
-- [x] Digit classifier can be trained on MNIST but there is no input normalization therefore the classifier does not work.
-- [ ] The classifier has a very low accuracy.
-- [ ] Hardcoded paths
-- [x] No sudoku solver
-- [ ] The entire pipeline is probably not very robust and there are no tests.
-- [ ] Probably a lot more
