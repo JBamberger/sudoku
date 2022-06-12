@@ -21,6 +21,6 @@ __pycache__/
 *.lib
 
 venv/
-data/
+data
 
 .others/

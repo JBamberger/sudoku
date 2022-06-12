@@ -66,13 +66,16 @@ android {
     externalNativeBuild {
         cmake {
             path "src/main/cpp/CMakeLists.txt"
-            version "3.23.1"
+            version "3.23.2"
         }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_11
         targetCompatibility JavaVersion.VERSION_11
     }
+
+    // Includes the contents from the 'share' directory in the project root as assets in the apk
+    sourceSets["main"].assets.srcDir(layout.projectDirectory.dir("../share"))
 }
 
 dependencies {
